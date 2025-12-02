@@ -10,10 +10,6 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.text({ type: 'application/x-yaml' }));
 
-/**
- * ENHANCED Kubernetes Schema Validator
- * Production-ready validation with security checks and best practices
- */
 
 // Helper: Check if a value exists
 const exists = (val) => val !== undefined && val !== null && val !== '';

@@ -1,9 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+// @ts-ignore
 import { saveAs } from 'file-saver';
 import { Layout } from './components/Layout';
-import { CodeEditor } from './components/CodeEditor';
+import { CodeEditor, type EditorMarker } from './components/CodeEditor';
 import { LinterOutput } from './components/LinterOutput';
 import { Documentation } from './components/Documentation';
+import { IndentationValidator, type ValidationError as IndentError } from './stages/indentation-validator';
 
 // Default example - Valid Kubernetes Deployment
 const DEFAULT_YAML = `apiVersion: apps/v1
@@ -37,9 +39,28 @@ function App() {
   const [isValid, setIsValid] = useState<boolean | null>(null);
   const [errors, setErrors] = useState<any[]>([]);
   const [warnings, setWarnings] = useState<any[]>([]);
+  const [indentationErrors, setIndentationErrors] = useState<IndentError[]>([]);
   const [loading, setLoading] = useState(false);
   const [documentCount, setDocumentCount] = useState(0);
   const [showDocs, setShowDocs] = useState(false);
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('theme') as 'light' | 'dark' || 'light';
+    }
+    return 'light';
+  });
+
+  const indentationValidator = useMemo(() => new IndentationValidator(), []);
+
+  // Update theme
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  };
 
   // Validate YAML against backend
   const validateYaml = useCallback(async (code: string) => {
@@ -47,12 +68,18 @@ function App() {
       setIsValid(null);
       setErrors([]);
       setWarnings([]);
+      setIndentationErrors([]);
       setDocumentCount(0);
       return;
     }
 
     setLoading(true);
     try {
+      // 1. Run Client-side Indentation Validation
+      const indentResult = indentationValidator.validate(code, { style: 'auto' });
+      setIndentationErrors(indentResult.errors);
+
+      // 2. Run Server-side Validation
       const response = await fetch('http://localhost:3001/api/validate', {
         method: 'POST',
         headers: {
@@ -63,7 +90,7 @@ function App() {
 
       const data = await response.json();
 
-      setIsValid(data.valid);
+      setIsValid(data.valid && indentResult.valid);
       setErrors(data.errors || []);
       setWarnings(data.warnings || []);
       setDocumentCount(data.documentCount || 0);
@@ -80,7 +107,7 @@ function App() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [indentationValidator]);
 
   // Debounced validation (500ms delay)
   useEffect(() => {
@@ -98,6 +125,71 @@ function App() {
       setYamlCode(value);
     }
   };
+
+  const handleFixIndentation = () => {
+    const result = indentationValidator.fix(yamlCode, { style: 'auto', fixTrailingSpaces: true, mode: 'indentation' });
+    if (result.fixedCount > 0) {
+      setYamlCode(result.content);
+      // Re-validate immediately
+      validateYaml(result.content);
+    }
+  };
+
+  const handleFixSyntax = () => {
+    const result = indentationValidator.fix(yamlCode, { style: 'auto', fixTrailingSpaces: true, mode: 'syntax' });
+    if (result.fixedCount > 0) {
+      setYamlCode(result.content);
+      // Re-validate immediately
+      validateYaml(result.content);
+    }
+  };
+
+  // Convert errors to Monaco markers
+  const markers: EditorMarker[] = useMemo(() => {
+    const allMarkers: EditorMarker[] = [];
+
+    // Indentation Errors
+    indentationErrors.forEach(err => {
+      allMarkers.push({
+        startLineNumber: err.line,
+        startColumn: err.column,
+        endLineNumber: err.line,
+        endColumn: 1000, // Highlight full line
+        message: err.message,
+        severity: 8 // MarkerSeverity.Error
+      });
+    });
+
+    // Backend Errors
+    errors.forEach(err => {
+      if (err.line) {
+        allMarkers.push({
+          startLineNumber: err.line,
+          startColumn: err.column || 1,
+          endLineNumber: err.line,
+          endColumn: 1000,
+          message: err.message,
+          severity: 8 // MarkerSeverity.Error
+        });
+      }
+    });
+
+    // Backend Warnings
+    warnings.forEach(warn => {
+      if (warn.line) {
+        allMarkers.push({
+          startLineNumber: warn.line,
+          startColumn: warn.column || 1,
+          endLineNumber: warn.line,
+          endColumn: 1000,
+          message: warn.message,
+          severity: 4 // MarkerSeverity.Warning
+        });
+      }
+    });
+
+    return allMarkers;
+  }, [errors, warnings, indentationErrors]);
 
   // Export YAML to file
   const handleExport = () => {
@@ -128,6 +220,8 @@ function App() {
       onCopy={handleCopy}
       showDocs={showDocs}
       onToggleView={setShowDocs}
+      theme={theme}
+      onToggleTheme={toggleTheme}
     >
       {/* Content */}
       {showDocs ? (
@@ -136,7 +230,12 @@ function App() {
         <div className="flex w-full h-full">
           {/* Editor Pane - 50% width */}
           <div className="w-1/2 h-full">
-            <CodeEditor value={yamlCode} onChange={handleEditorChange} />
+            <CodeEditor
+              value={yamlCode}
+              onChange={handleEditorChange}
+              markers={markers}
+              theme={theme}
+            />
           </div>
 
           {/* Output Pane - 50% width */}
@@ -145,8 +244,11 @@ function App() {
               isValid={isValid}
               errors={errors}
               warnings={warnings}
+              indentationErrors={indentationErrors}
               loading={loading}
               documentCount={documentCount}
+              onFixIndentation={handleFixIndentation}
+              onFixSyntax={handleFixSyntax}
             />
           </div>
         </div>
