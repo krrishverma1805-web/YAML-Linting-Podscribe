@@ -8,172 +8,318 @@ export interface FixResult {
     warnings: string[];
 }
 
+interface LineContext {
+    index: number;
+    original: string;
+    trimmed: string;
+    isListItem: boolean;
+    isComment: boolean;
+    isEmpty: boolean;
+}
+
 /**
- * Bulletproof YAML Fixer - ALWAYS works
+ * Industry-Grade YAML Syntax Fixer
+ * 
+ * Architecture:
+ * 1. Strategy A: Parse & Rebuild (Nuclear option, best results)
+ * 2. Strategy B: Heuristic Line-by-Line Fix (Fallback)
+ *    - Pass 1: Preprocessing (Global cleanup)
+ *    - Pass 2: Syntax Fixing (Colons, quotes, spacing)
+ *    - Pass 3: Indentation Reconstruction (Stack-based structural alignment)
  */
 export class YAMLSyntaxFixer {
 
-    fix(content: string, indentSize: number = 2): FixResult {
-        console.log('[YAML FIXER] Starting...');
+    /**
+     * Main entry point for fixing YAML
+     */
+    public fix(content: string, indentSize: number = 2): FixResult {
+        console.log('[YAML FIXER] Starting fix process...');
 
-        // Strategy 1: Try parse and rebuild (best quality)
+        // Strategy 1: Try to parse and rebuild first
+        // This is the most robust method if the YAML is only slightly malformed
+        const parseResult = this.tryParseAndRebuild(content, indentSize);
+        if (parseResult.success) {
+            return parseResult;
+        }
+
+        console.log('[YAML FIXER] Parse failed, falling back to heuristic fix...');
+
+        // Strategy 2: Heuristic Line-by-Line Fix
+        return this.heuristicFix(content, indentSize);
+    }
+
+    /**
+     * Strategy 1: Parse and Rebuild using js-yaml
+     */
+    private tryParseAndRebuild(content: string, indentSize: number): FixResult {
         try {
             const parsed = yaml.load(content);
-            if (parsed) {
+            if (parsed && typeof parsed === 'object') {
                 const rebuilt = yaml.dump(parsed, {
                     indent: indentSize,
                     lineWidth: -1,
                     noRefs: true,
-                    sortKeys: false
+                    sortKeys: false,
+                    quotingType: '"',
+                    forceQuotes: false
                 });
 
                 console.log('[YAML FIXER] ✓ Successfully parsed and rebuilt');
                 return {
                     content: rebuilt,
                     success: true,
-                    fixedCount: 1,
+                    fixedCount: 1, // Treated as one big fix
                     errors: [],
                     warnings: []
                 };
             }
         } catch (e) {
-            console.log('[YAML FIXER] Parse failed, using line-by-line fix');
+            // Ignore error, proceed to fallback
         }
-
-        // Strategy 2: Aggressive line-by-line (always works)
-        return this.lineByLineFix(content, indentSize);
+        return { content: '', success: false, fixedCount: 0, errors: [], warnings: [] };
     }
 
-    private lineByLineFix(content: string, indentSize: number): FixResult {
-        // 1. Global cleanup: tabs and trailing whitespace
-        // This handles comments and empty lines too
-        let processed = content.replace(/\t/g, '  ');
-        processed = processed.replace(/[ \t]+$/gm, '');
+    /**
+     * Strategy 2: Heuristic Fix
+     * Pipeline: Preprocess -> Fix Syntax -> Reconstruct Indentation
+     */
+    private heuristicFix(content: string, indentSize: number): FixResult {
+        // Step 1: Preprocessing (Global cleanup)
+        const preprocessed = this.preprocess(content);
 
-        const lines = processed.split('\n');
-        const fixed: string[] = [];
+        // Step 2: Line-by-line processing
+        const lines = preprocessed.split('\n');
+        const fixedLines: string[] = [];
         let fixedCount = 0;
 
-        // Stack to track indentation levels
-        // We store the actual space count, not just level index
+        // State for indentation reconstruction
         const indentStack: number[] = [0];
 
         for (let i = 0; i < lines.length; i++) {
-            let line = lines[i];
-            const original = line; // Note: this is from 'processed', so tabs/trailing spaces already gone
-            const trimmed = line.trim();
+            const line = lines[i];
+            const context = this.analyzeLine(line, i);
 
-            // Empty lines - preserve (they are already cleaned of whitespace)
-            if (trimmed.length === 0) {
-                fixed.push('');
+            // Skip empty lines (preserve them)
+            if (context.isEmpty) {
+                fixedLines.push('');
                 continue;
             }
 
-            // Comments - preserve indentation but clean content
-            if (trimmed.startsWith('#')) {
-                // Try to keep comment aligned with code? For now just keep as is
-                fixed.push(line);
+            // Comments: preserve but clean up
+            if (context.isComment) {
+                fixedLines.push(line);
                 continue;
             }
 
-            // Determine target indentation
-            let targetIndent = indentStack[indentStack.length - 1];
+            // Step 3: Fix Syntax (Colons, Spacing, Quotes)
+            let fixedContent = this.fixLineSyntax(context.trimmed);
 
-            // Check for dedentation in original
-            const originalIndent = line.match(/^(\s*)/)?.[1].length || 0;
+            // Step 4: Reconstruct Indentation
+            const targetIndent = this.determineIndent(
+                context,
+                fixedContent,
+                indentStack,
+                fixedLines,
+                indentSize
+            );
 
-            // If original is significantly dedented compared to expected, pop stack
-            // We allow some fuzziness (e.g. 1 space difference)
-            while (indentStack.length > 1 && originalIndent <= indentStack[indentStack.length - 1] - indentSize) {
-                indentStack.pop();
-                targetIndent = indentStack[indentStack.length - 1];
-            }
-
-            // Special handling for list items
-            const isListItem = trimmed.startsWith('-');
-
-            // If this is a list item, it should match the current stack level
-            // If it's a property (not list item), it might need to be indented deeper if inside a list
-            if (!isListItem && i > 0) {
-                // Look at previous line to see if we are inside a list item
-                const prevLine = fixed[fixed.length - 1].trim();
-                if (prevLine.startsWith('-') && !prevLine.endsWith(':')) {
-                    // Previous was "- value", current is "key: value" -> likely a sibling? 
-                    // No, usually "- name: foo\n  image: bar"
-                    // So if previous was list item, we expect properties to be indented
-                    targetIndent += indentSize;
-                } else if (prevLine.startsWith('-') && prevLine.endsWith(':')) {
-                    // Previous was "- key:", current is property -> indent
-                    targetIndent += indentSize;
-                }
-            }
-
-            // Apply fixes to content
-            let fixedContent = trimmed;
-
-            // Fix 1: Add missing colons to known keys
-            if (!fixedContent.includes(':') && !fixedContent.startsWith('-')) {
-                const k8sKeys = ['apiVersion', 'kind', 'metadata', 'spec', 'status', 'data',
-                    'labels', 'annotations', 'selector', 'template', 'containers',
-                    'ports', 'env', 'volumes', 'meta', 'resources', 'limits', 'requests'];
-                // Handle "meta &anchor" case
-                const keyPart = fixedContent.split(/\s+/)[0];
-                if (k8sKeys.some(k => k.toLowerCase() === keyPart.toLowerCase())) {
-                    // Don't add colon if it's already there or looks like a value
-                    if (!fixedContent.endsWith(':')) {
-                        fixedContent += ':';
-                    }
-                }
-            }
-
-            // Fix 2: Colon spacing
-            fixedContent = fixedContent.replace(/^([^\s:]+):(?!\s)(.+)/, '$1: $2');
-
-            // Fix 3: List spacing
-            fixedContent = fixedContent.replace(/^-(?!\s)(.+)/, '- $1');
-
-            // Fix 4: Close unclosed quotes
-            const dq = (fixedContent.match(/"/g) || []).length;
-            const sq = (fixedContent.match(/'/g) || []).length;
-            if (dq % 2 !== 0) fixedContent += '"';
-            if (sq % 2 !== 0) fixedContent += "'";
-
-            // Construct fixed line
+            // Construct final line
             const finalLine = ' '.repeat(targetIndent) + fixedContent;
-            fixed.push(finalLine);
+            fixedLines.push(finalLine);
 
-            if (finalLine !== original) {
+            if (finalLine !== line) {
                 fixedCount++;
-                console.log(`[FIX] Line ${i + 1}: "${original}" → "${finalLine}"`);
+                console.log(`[FIX] Line ${i + 1}: "${line}" → "${finalLine}"`);
             }
 
-            // Prepare stack for next line
-            // If this line ends with ':', next line should be indented
-            // Exception: "- key: value" does NOT indent next line (usually)
-            // But "- key:" DOES indent next line
-            if (fixedContent.endsWith(':')) {
-                indentStack.push(targetIndent + indentSize);
-            } else if (isListItem && !fixedContent.includes(':')) {
-                // "- value" -> next line usually same level (next item)
-            } else if (isListItem && fixedContent.includes(':')) {
-                // "- key: value" -> next line (sibling property) should be aligned with key?
-                // Actually, for k8s style:
-                // - name: foo
-                //   image: bar
-                // We want next line at targetIndent + indentSize?
-                // But we handled that with the "check previous line" logic above.
-                // So we don't push to stack here, we let the next iteration handle the offset.
-            }
+            // Update stack for next line
+            this.updateStack(fixedContent, targetIndent, indentStack, indentSize);
         }
 
-        console.log(`[YAML FIXER] Fixed ${fixedCount} lines`);
-
         return {
-            content: fixed.join('\n'),
+            content: fixedLines.join('\n'),
             success: true,
             fixedCount,
             errors: [],
             warnings: []
         };
+    }
+
+    /**
+     * Helper: Preprocess content (Tabs, Trailing Whitespace)
+     */
+    private preprocess(content: string): string {
+        // Convert tabs to 2 spaces
+        let processed = content.replace(/\t/g, '  ');
+        // Remove trailing whitespace from all lines
+        processed = processed.replace(/[ \t]+$/gm, '');
+        return processed;
+    }
+
+    /**
+     * Helper: Analyze line to create context
+     */
+    private analyzeLine(line: string, index: number): LineContext {
+        const trimmed = line.trim();
+        return {
+            index,
+            original: line,
+            trimmed,
+            isListItem: trimmed.startsWith('-'),
+            isComment: trimmed.startsWith('#'),
+            isEmpty: trimmed.length === 0
+        };
+    }
+
+    /**
+     * Helper: Fix syntax errors within a line
+     */
+    private fixLineSyntax(content: string): string {
+        let fixed = content;
+
+        // 1. Add missing colons to known Kubernetes keys
+        if (!fixed.includes(':') && !fixed.startsWith('-')) {
+            const k8sKeys = [
+                'apiVersion', 'kind', 'metadata', 'spec', 'status', 'data',
+                'labels', 'annotations', 'selector', 'template', 'containers',
+                'ports', 'env', 'volumes', 'meta', 'resources', 'limits',
+                'requests', 'command', 'args', 'image', 'name', 'value', 'key'
+            ];
+            const keyPart = fixed.split(/\s+/)[0];
+            // Check exact match or case-insensitive match
+            if (k8sKeys.some(k => k.toLowerCase() === keyPart.toLowerCase())) {
+                if (!fixed.endsWith(':')) {
+                    fixed += ':';
+                }
+            }
+        }
+
+        // 2. Fix colon spacing (key:value -> key: value)
+        // Look for colon followed by non-space, excluding URLs (http://)
+        fixed = fixed.replace(/^([^:\s]+):(?!\s)(\S)/, '$1: $2');
+
+        // 3. Fix list item spacing (-item -> - item)
+        fixed = fixed.replace(/^-([^\s-])/, '- $1');
+
+        // 4. Close unclosed quotes
+        const dq = (fixed.match(/"/g) || []).length;
+        const sq = (fixed.match(/'/g) || []).length;
+        if (dq % 2 !== 0) fixed += '"';
+        if (sq % 2 !== 0) fixed += "'";
+
+        return fixed;
+    }
+
+    /**
+     * Helper: Determine correct indentation based on context and stack
+     */
+    private determineIndent(
+        ctx: LineContext,
+        fixedContent: string,
+        stack: number[],
+        fixedLines: string[],
+        indentSize: number
+    ): number {
+        // Current expected level
+        let targetIndent = stack[stack.length - 1];
+
+        // Calculate original indentation (from preprocessed line)
+        const originalIndent = ctx.original.match(/^(\s*)/)?.[1].length || 0;
+
+        // Check context from previous line
+        let prevLineExpectsChildren = false;
+        if (fixedLines.length > 0) {
+            const lastFixed = fixedLines[fixedLines.length - 1].trim();
+            // Check if last line ends with colon (ignoring comments)
+            const cleanLast = lastFixed.replace(/#.*$/, '').trim();
+            if (cleanLast.endsWith(':') && !cleanLast.startsWith('-')) {
+                prevLineExpectsChildren = true;
+            } else if (cleanLast.startsWith('-') && cleanLast.endsWith(':')) {
+                prevLineExpectsChildren = true;
+            }
+        }
+
+        // LOGIC 1: Handling Dedentation
+        // If previous line does NOT expect children, we might need to dedent (pop stack)
+        if (!prevLineExpectsChildren) {
+            if (ctx.isListItem) {
+                // For list items, snap to nearest valid stack level
+                const bestMatch = this.findBestStackMatch(originalIndent, stack);
+                if (bestMatch !== -1) {
+                    // Pop stack until we reach the matching level
+                    while (stack.length - 1 > bestMatch) {
+                        stack.pop();
+                    }
+                    targetIndent = stack[stack.length - 1];
+                } else {
+                    // Fallback: standard dedent logic
+                    while (stack.length > 1 && originalIndent <= stack[stack.length - 1] - indentSize) {
+                        stack.pop();
+                        targetIndent = stack[stack.length - 1];
+                    }
+                }
+            } else {
+                // For regular keys, standard dedent logic
+                while (stack.length > 1 && originalIndent <= stack[stack.length - 1] - indentSize) {
+                    stack.pop();
+                    targetIndent = stack[stack.length - 1];
+                }
+            }
+        } else {
+            // LOGIC 2: Forced Indentation (Children)
+            // If previous line expects children, we DO NOT pop stack.
+            // We implicitly expect the current line to be at 'targetIndent' (which is parent + indentSize)
+            // Note: The stack update from the *previous* iteration should have already pushed the new level.
+        }
+
+        // LOGIC 3: List Item Property Alignment
+        // If this is a property inside a list, align it correctly
+        if (!ctx.isListItem && fixedLines.length > 0) {
+            const prevFixedLine = fixedLines[fixedLines.length - 1];
+            const prevIndent = prevFixedLine.match(/^(\s*)/)?.[1].length || 0;
+            const prevTrimmed = prevFixedLine.trim();
+
+            // If current line is a key-value pair
+            if (fixedContent.includes(':')) {
+                // Case A: Previous was "- key: val" -> Align with "key" (indent + 2)
+                if (prevTrimmed.startsWith('-')) {
+                    targetIndent = prevIndent + indentSize;
+                }
+                // Case B: Previous was property inside list -> Match its indent
+                else if (prevIndent > stack[stack.length - 1]) {
+                    targetIndent = prevIndent;
+                }
+            }
+        }
+
+        return targetIndent;
+    }
+
+    /**
+     * Helper: Find best matching indentation level in stack
+     */
+    private findBestStackMatch(indent: number, stack: number[]): number {
+        for (let i = stack.length - 1; i >= 0; i--) {
+            // Allow fuzzy match (±1 space)
+            if (Math.abs(stack[i] - indent) <= 1) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Helper: Update stack for next line
+     */
+    private updateStack(fixedContent: string, currentIndent: number, stack: number[], indentSize: number): void {
+        // Check if this line expects children (ends with colon)
+        const cleanContent = fixedContent.replace(/#.*$/, '').trim();
+
+        if (cleanContent.endsWith(':') && !cleanContent.startsWith('-')) {
+            // Push new level: current + indentSize
+            stack.push(currentIndent + indentSize);
+        }
+        // Note: We don't push for "- key:", because the next line (sibling property) 
+        // is handled by the "List Item Property Alignment" logic in determineIndent.
     }
 }

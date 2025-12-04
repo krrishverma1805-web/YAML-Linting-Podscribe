@@ -5,8 +5,8 @@ interface LayoutProps {
     onExport: () => void;
     onImport: (content: string) => void;
     onCopy: () => void;
-    showDocs: boolean;
-    onToggleView: (showDocs: boolean) => void;
+    currentView: 'linter' | 'docs' | 'fixer';
+    onViewChange: (view: 'linter' | 'docs' | 'fixer') => void;
     theme?: 'light' | 'dark';
     onToggleTheme?: () => void;
 }
@@ -16,8 +16,8 @@ export const Layout: React.FC<LayoutProps> = ({
     onExport,
     onImport,
     onCopy,
-    showDocs,
-    onToggleView,
+    currentView,
+    onViewChange,
     theme = 'light',
     onToggleTheme
 }) => {
@@ -33,6 +33,8 @@ export const Layout: React.FC<LayoutProps> = ({
                 setShowImportDialog(false);
             };
             reader.readAsText(file);
+            // Reset input so the same file can be selected again
+            e.target.value = '';
         }
     };
 
@@ -46,8 +48,8 @@ export const Layout: React.FC<LayoutProps> = ({
                             {/* View Switcher */}
                             <div className="bg-[var(--color-bg-secondary)] rounded-lg p-0.5 flex space-x-0.5 border border-[var(--color-border)]">
                                 <button
-                                    onClick={() => onToggleView(false)}
-                                    className={`px-5 py-2 text-sm font-medium rounded-md transition-all duration-200 ${!showDocs
+                                    onClick={() => onViewChange('linter')}
+                                    className={`px-5 py-2 text-sm font-medium rounded-md transition-all duration-200 ${currentView === 'linter'
                                         ? 'bg-[var(--color-blue)] text-white shadow-sm'
                                         : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-primary)]'
                                         }`}
@@ -55,8 +57,17 @@ export const Layout: React.FC<LayoutProps> = ({
                                     Linter
                                 </button>
                                 <button
-                                    onClick={() => onToggleView(true)}
-                                    className={`px-5 py-2 text-sm font-medium rounded-md transition-all duration-200 ${showDocs
+                                    onClick={() => onViewChange('fixer')}
+                                    className={`px-5 py-2 text-sm font-medium rounded-md transition-all duration-200 ${currentView === 'fixer'
+                                        ? 'bg-[var(--color-blue)] text-white shadow-sm'
+                                        : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-primary)]'
+                                        }`}
+                                >
+                                    YAML Fixer
+                                </button>
+                                <button
+                                    onClick={() => onViewChange('docs')}
+                                    className={`px-5 py-2 text-sm font-medium rounded-md transition-all duration-200 ${currentView === 'docs'
                                         ? 'bg-[var(--color-blue)] text-white shadow-sm'
                                         : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-primary)]'
                                         }`}

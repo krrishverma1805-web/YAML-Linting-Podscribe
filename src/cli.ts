@@ -176,4 +176,119 @@ indentCmd
         }
     });
 
+// YAML Commands (New Industry-Grade Fixer)
+const yamlCmd = program
+    .command('yaml')
+    .description('YAML validation and fixing commands');
+
+yamlCmd
+    .command('validate')
+    .argument('<path>', 'Path to file or directory to validate')
+    .description('Validate YAML files for syntax and structural issues')
+    .action(async (validatePath) => {
+        try {
+            const { YAMLFixer } = await import('./core/yaml-fixer.js');
+            const fs = await import('fs');
+            const glob = await import('glob');
+
+            const fixer = new YAMLFixer();
+            let files: string[] = [];
+
+            if (fs.statSync(validatePath).isDirectory()) {
+                files = glob.sync(`${validatePath}/**/*.{yaml,yml}`);
+            } else {
+                files = [validatePath];
+            }
+
+            let hasErrors = false;
+
+            for (const file of files) {
+                const content = fs.readFileSync(file, 'utf-8');
+                const result = fixer.validate(content);
+
+                if (!result.valid) {
+                    hasErrors = true;
+                    console.log(chalk.bold.underline(file));
+                    for (const error of result.errors) {
+                        const color = error.severity === 'critical' || error.severity === 'error' ? chalk.red : chalk.yellow;
+                        console.log(`  ${color(error.severity.toUpperCase())} Line ${error.line} - ${error.message}`);
+                    }
+                    console.log('');
+                } else {
+                    console.log(chalk.green(`✓ ${file}`));
+                }
+            }
+
+            if (hasErrors) {
+                process.exit(1);
+            } else {
+                console.log(chalk.green('\nAll files are valid!'));
+            }
+        } catch (error) {
+            console.error(chalk.red('Error:'), error);
+            process.exit(1);
+        }
+    });
+
+yamlCmd
+    .command('fix')
+    .argument('<path>', 'Path to file or directory to fix')
+    .option('--aggressive', 'Apply aggressive structural fixes (move fields to correct locations)')
+    .option('--dry-run', 'Preview changes without modifying files')
+    .option('--diff', 'Show detailed diff of changes')
+    .description('Fix YAML syntax and structural issues')
+    .action(async (fixPath, options) => {
+        try {
+            const { YAMLFixer } = await import('./core/yaml-fixer.js');
+            const fs = await import('fs');
+            const glob = await import('glob');
+
+            const fixer = new YAMLFixer();
+            let files: string[] = [];
+
+            if (fs.statSync(fixPath).isDirectory()) {
+                files = glob.sync(`${fixPath}/**/*.{yaml,yml}`);
+            } else {
+                files = [fixPath];
+            }
+
+            for (const file of files) {
+                const content = fs.readFileSync(file, 'utf-8');
+                const result = fixer.fix(content, { aggressive: options.aggressive });
+
+                if (result.fixedCount > 0) {
+                    console.log(chalk.bold(file));
+                    console.log(chalk.blue(`  Fixed ${result.fixedCount} issues.`));
+
+                    if (options.diff) {
+                        console.log(chalk.gray('  Changes:'));
+                        for (const change of result.changes) {
+                            const severityColor = change.severity === 'critical' ? chalk.red :
+                                change.severity === 'error' ? chalk.red :
+                                    change.severity === 'warning' ? chalk.yellow : chalk.blue;
+                            console.log(severityColor(`  [${change.type}] Line ${change.line}: ${change.reason}`));
+                            if (change.original && change.fixed && change.type !== 'STRUCTURE') {
+                                console.log(chalk.red(`    - ${change.original.trimEnd()}`));
+                                console.log(chalk.green(`    + ${change.fixed.trimEnd()}`));
+                            }
+                        }
+                    }
+
+                    if (!options.dryRun) {
+                        fs.writeFileSync(file, result.content);
+                        console.log(chalk.green('  Saved changes.'));
+                    } else {
+                        console.log(chalk.yellow('  Dry run - no changes saved.'));
+                    }
+                    console.log('');
+                } else {
+                    console.log(chalk.green(`✓ ${file} - No issues found`));
+                }
+            }
+        } catch (error) {
+            console.error(chalk.red('Error:'), error);
+            process.exit(1);
+        }
+    });
+
 program.parse();

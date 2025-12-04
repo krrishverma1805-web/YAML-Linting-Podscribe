@@ -1,0 +1,28 @@
+apiVersion v1
+kind Deployment
+met
+  name broken-app
+  namespace default
+spec
+  replicas three
+  template
+    metadata
+      labels
+        app: frontend
+    spec
+      containers
+        - name nginx
+          image: nginx
+          ports
+            - containerPort 80
+              protocol:TCP
+      restartPolicy Always
+---
+kind Service
+meta
+  name broken-svc
+spec
+  type LoadBalancer
+  ports
+    - port 80
+      targetPort 80

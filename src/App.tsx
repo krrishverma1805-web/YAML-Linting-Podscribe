@@ -3,10 +3,12 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { saveAs } from 'file-saver';
 import { Layout } from './components/Layout';
 import { CodeEditor, type EditorMarker } from './components/CodeEditor';
+import { Snackbar, Alert } from '@mui/material';
 import { LinterOutput } from './components/LinterOutput';
 import { Documentation } from './components/Documentation';
+import { YamlFixerPage } from './pages/YamlFixerPage';
 import { IndentationValidator, type ValidationError as IndentError } from './stages/indentation-validator';
-import { YAMLSyntaxFixer } from './utils/yaml-syntax-fixer';
+import { YAMLValidator } from './core/yaml-validator-complete';
 
 // Default example - Valid Kubernetes Deployment
 const DEFAULT_YAML = `apiVersion: apps/v1
@@ -43,7 +45,7 @@ function App() {
   const [indentationErrors, setIndentationErrors] = useState<IndentError[]>([]);
   const [loading, setLoading] = useState(false);
   const [documentCount, setDocumentCount] = useState(0);
-  const [showDocs, setShowDocs] = useState(false);
+  const [currentView, setCurrentView] = useState<'linter' | 'docs' | 'fixer'>('linter');
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('theme') as 'light' | 'dark' || 'light';
@@ -112,14 +114,14 @@ function App() {
 
   // Debounced validation (500ms delay)
   useEffect(() => {
-    if (!showDocs) {
+    if (currentView === 'linter') {
       const timer = setTimeout(() => {
         validateYaml(yamlCode);
       }, 500);
 
       return () => clearTimeout(timer);
     }
-  }, [yamlCode, validateYaml, showDocs]);
+  }, [yamlCode, validateYaml, currentView]);
 
   const handleEditorChange = (value: string | undefined) => {
     if (value !== undefined) {
@@ -127,49 +129,58 @@ function App() {
     }
   };
 
-  const handleFixIndentation = () => {
-    console.log('========== FIX INDENTATION CLICKED ==========');
-    console.log('Input length:', yamlCode.length);
+  // Snackbar State
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error' | 'info' | 'warning'>('info');
+
+  const handleCloseSnackbar = () => {
+    setSnackbarOpen(false);
+  };
+
+  const showNotification = (message: string, severity: 'success' | 'error' | 'info' | 'warning') => {
+    setSnackbarMessage(message);
+    setSnackbarSeverity(severity);
+    setSnackbarOpen(true);
+  };
+
+  // Unified Fix Handler
+  const applyFix = (fixerName: string) => {
+    console.log(`========== ${fixerName} CLICKED ==========`);
 
     try {
-      const fixer = new YAMLSyntaxFixer();
-      const result = fixer.fix(yamlCode, 2);
+      const validator = new YAMLValidator();
+      // Use the new fix method
+      const result = validator.fix(yamlCode, { indentSize: 2 });
 
-      console.log('[FIX INDENT] Success:', result.success);
-      console.log('[FIX INDENT] Fixed count:', result.fixedCount);
-      console.log('[FIX INDENT] Output length:', result.content.length);
+      console.log(`[${fixerName}] Result:`, result);
 
-      // ALWAYS update, even if no changes
-      setYamlCode(result.content);
-      setTimeout(() => validateYaml(result.content), 100);
+      // The new validator always returns content, even if no changes.
+      // We check fixedCount to see if anything happened.
+      if (result.fixedCount > 0) {
+        setYamlCode(result.content);
+        // Re-validate immediately
+        setTimeout(() => validateYaml(result.content), 100);
+
+        showNotification(
+          `Successfully fixed ${result.fixedCount} issue${result.fixedCount !== 1 ? 's' : ''} using ${fixerName}`,
+          'success'
+        );
+      } else {
+        showNotification(`No changes needed - YAML appears correct according to ${fixerName}`, 'info');
+      }
 
     } catch (error) {
-      console.error('[FIX INDENT] FATAL ERROR:', error);
-      alert('Fix Indentation failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      console.error(`[${fixerName}] FATAL ERROR:`, error);
+      showNotification(
+        `Critical error in ${fixerName}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'error'
+      );
     }
   };
 
-  const handleFixSyntax = () => {
-    console.log('========== FIX SYNTAX CLICKED ==========');
-    console.log('Input length:', yamlCode.length);
-
-    try {
-      const fixer = new YAMLSyntaxFixer();
-      const result = fixer.fix(yamlCode, 2);
-
-      console.log('[FIX SYNTAX] Success:', result.success);
-      console.log('[FIX SYNTAX] Fixed count:', result.fixedCount);
-      console.log('[FIX SYNTAX] Output length:', result.content.length);
-
-      // ALWAYS update, even if no changes
-      setYamlCode(result.content);
-      setTimeout(() => validateYaml(result.content), 100);
-
-    } catch (error) {
-      console.error('[FIX SYNTAX] FATAL ERROR:', error);
-      alert('Fix Syntax failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
-    }
-  };
+  const handleFixIndentation = () => applyFix('Indentation Fixer');
+  const handleFixSyntax = () => applyFix('Syntax Fixer');
 
   // Convert errors to Monaco markers
   const markers: EditorMarker[] = useMemo(() => {
@@ -223,20 +234,23 @@ function App() {
     const blob = new Blob([yamlCode], { type: 'text/yaml;charset=utf-8' });
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
     saveAs(blob, `k8s-manifest-${timestamp}.yaml`);
+    showNotification('File exported successfully', 'success');
   };
 
   // Import YAML from file
   const handleImport = (content: string) => {
     setYamlCode(content);
+    showNotification('File imported successfully', 'success');
   };
 
   // Copy to clipboard
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(yamlCode);
-      console.log('Copied to clipboard!');
+      showNotification('Copied to clipboard!', 'success');
     } catch (error) {
       console.error('Failed to copy:', error);
+      showNotification('Failed to copy to clipboard', 'error');
     }
   };
 
@@ -245,14 +259,16 @@ function App() {
       onExport={handleExport}
       onImport={handleImport}
       onCopy={handleCopy}
-      showDocs={showDocs}
-      onToggleView={setShowDocs}
+      currentView={currentView}
+      onViewChange={setCurrentView}
       theme={theme}
       onToggleTheme={toggleTheme}
     >
       {/* Content */}
-      {showDocs ? (
+      {currentView === 'docs' ? (
         <Documentation />
+      ) : currentView === 'fixer' ? (
+        <YamlFixerPage />
       ) : (
         <div className="flex w-full h-full">
           {/* Editor Pane - 50% width */}
@@ -280,6 +296,18 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* Notifications */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={4000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity={snackbarSeverity} sx={{ width: '100%' }}>
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
     </Layout>
   );
 }
