@@ -140,7 +140,7 @@ k8s-yaml-lint/
 └── public/                  # Static assets
 ```
 
-## 🚀 Getting Started
+##  Getting Started
 
 ### **Prerequisites**
 - Node.js 18+ 
@@ -237,7 +237,7 @@ Validate and fix YAML content
 }
 ```
 
-## 🎨 Design System
+##  Design System
 
 ### **Colors**
 - **Primary Blue:** `#007AFF` - Actions, links
@@ -254,7 +254,7 @@ Validate and fix YAML content
 - **Opacity:** 40-70% backgrounds
 - **Borders:** 10-20% opacity
 
-## 🧪 Testing
+##  Testing
 
 ```bash
 # Run tests
@@ -267,7 +267,7 @@ npm test -- --watch
 npm test -- --coverage
 ```
 
-## 🔧 Configuration
+##  Configuration
 
 ### **Validator Options**
 ```typescript
@@ -287,14 +287,14 @@ PORT=3001                    # Backend server port
 VITE_API_URL=http://localhost:3001  # API endpoint
 ```
 
-## 📊 Performance
+##  Performance
 
 - **Validation Speed:** < 100ms for typical manifests
 - **Fix Accuracy:** 90%+ across all K8s resource types
 - **Bundle Size:** ~500KB (gzipped)
 - **First Load:** < 2s
 
-## 🤝 Contributing
+##  Contributing
 
 Contributions are welcome! Please:
 1. Fork the repository
@@ -303,18 +303,18 @@ Contributions are welcome! Please:
 4. Add tests
 5. Submit a pull request
 
-## 📝 License
+##  License
 
 MIT License - see LICENSE file for details
 
-## 🙏 Acknowledgments
+##  Acknowledgments
 
 - Monaco Editor by Microsoft
 - js-yaml library
 - Kubernetes community
 - React and Vite teams
 
-## 📞 Support
+##  Support
 
 - **Issues:** GitHub Issues
 - **Discussions:** GitHub Discussions
