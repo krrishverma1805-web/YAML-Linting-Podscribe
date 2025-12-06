@@ -12,8 +12,8 @@
 
 import * as yaml from 'js-yaml';
 
-import { getSchema, isKnownKind } from '../schema/k8s-schemas.js';
-import type { K8sResourceSchema } from '../schema/schema-types.js';
+// import { getSchema, isKnownKind } from '../schema/k8s-schemas.js';
+// import type { K8sResourceSchema } from '../schema/schema-types.js';
 
 // ==========================================
 // TYPES
@@ -156,7 +156,22 @@ const TYPO_CORRECTIONS: Record<string, string> = {
     'image-pull-policy': 'imagePullPolicy',
     'restartpolicy': 'restartPolicy',
     'restart-policy': 'restartPolicy',
-    'terminationgraceperiodseconds': 'terminationGracePeriodSeconds'
+    'terminationgraceperiodseconds': 'terminationGracePeriodSeconds',
+    'volums': 'volumes',
+    'volum': 'volumes',
+    'envrionment': 'env',
+    'environmet': 'env',
+    'enviroment': 'env',
+    'specc': 'spec',
+    'sppec': 'spec',
+    'contaiers': 'containers',
+    'contaienrs': 'containers',
+    'containerss': 'containers',
+    'lable': 'labels',
+    'label': 'labels',
+    // 'lables': 'labels', // Duplicate removed
+    'namespacee': 'namespace',
+    'namespac': 'namespace'
 };
 
 // Word to number mapping for type coercion
@@ -337,6 +352,105 @@ export class MultiPassFixer {
     }
 
     /**
+     * Helper: Calculate Levenshtein distance between two strings
+     */
+    private levenshteinDistance(a: string, b: string): number {
+        const matrix = [];
+
+        for (let i = 0; i <= b.length; i++) {
+            matrix[i] = [i];
+        }
+
+        for (let j = 0; j <= a.length; j++) {
+            matrix[0][j] = j;
+        }
+
+        for (let i = 1; i <= b.length; i++) {
+            for (let j = 1; j <= a.length; j++) {
+                if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                    matrix[i][j] = matrix[i - 1][j - 1];
+                } else {
+                    matrix[i][j] = Math.min(
+                        matrix[i - 1][j - 1] + 1, // substitution
+                        Math.min(
+                            matrix[i][j - 1] + 1, // insertion
+                            matrix[i - 1][j] + 1 // deletion
+                        )
+                    );
+                }
+            }
+        }
+
+        return matrix[b.length][a.length];
+    }
+
+    /**
+     * Helper: Fuzzy match a key against known K8s keys
+     */
+    private fuzzyMatchKey(key: string): string | null {
+        // Don't fuzz short keys to avoid false positives
+        if (key.length < 3) return null;
+
+        // Exact match check (case-insensitive)
+        const lowerKey = key.toLowerCase();
+        for (const known of KNOWN_K8S_KEYS) {
+            if (known.toLowerCase() === lowerKey) return known;
+        }
+
+        // Check explicit typo map first
+        if (TYPO_CORRECTIONS[lowerKey]) return TYPO_CORRECTIONS[lowerKey];
+        if (FIELD_TYPO_MAP[key]) return FIELD_TYPO_MAP[key];
+
+        let bestMatch = null;
+        let minDistance = Infinity;
+
+        // Threshold: 
+        // For short words (3-5 chars), allow 1 edit.
+        // For medium words (6-10 chars), allow 2 edits.
+        // For long words (>10 chars), allow 3 edits OR 40% difference.
+        // Special case: "api213244version" -> "apiVersion" (contains sub-sequence)
+
+        for (const known of KNOWN_K8S_KEYS) {
+            // Optimization: Skip if length difference is too big
+            // Relaxed to 8 to catch "api213244version" (16 vs 10, diff 6)
+            if (Math.abs(known.length - key.length) > 8 && !key.includes(known) && !known.includes(key)) continue;
+
+            const dist = this.levenshteinDistance(lowerKey, known.toLowerCase());
+
+            // Calculate max allowed distance based on length
+            let maxDist = 1;
+            if (known.length > 5) maxDist = 2;
+            if (known.length > 10) maxDist = 3;
+
+            // Special handling for the user's specific example "api213244version"
+            // If the key strictly CONTAINS the known key (minus digits maybe?), it's a strong signal
+            // Or if known key is a subsequence of the noise
+            if (key.length > known.length && key.includes(known)) {
+                // "apiVersion" in "myapiVersion" -> dist will be high, but containment is true.
+                // We should be careful. "containerPort" contains "port".
+                // Let's rely on distance for now, but maybe allow higher distance if there is a substring match?
+            }
+
+            // User example: api213244version (length 16) vs apiVersion (length 10). Dist is 6.
+            // My default maxDist is 3. This won't catch it.
+            // I need a more aggressive check for "very mangled" keys if they resemble important root keys.
+
+            // Aggressive check for Root Keys
+            if (['apiVersion', 'kind', 'metadata', 'spec'].includes(known)) {
+                // Allow up to 60% edits for these critical keys to catch wild typos
+                maxDist = Math.max(maxDist, Math.floor(key.length * 0.6));
+            }
+
+            if (dist <= maxDist && dist < minDistance) {
+                minDistance = dist;
+                bestMatch = known;
+            }
+        }
+
+        return bestMatch;
+    }
+
+    /**
      * Main fix method - orchestrates all 5 passes
      */
     async fix(content: string): Promise<FixResult> {
@@ -437,6 +551,21 @@ export class MultiPassFixer {
         currentLines = fieldNameResult.lines;
         if (fieldNameResult.changes.length > 0) {
             changes.push(...fieldNameResult.changes);
+        }
+
+        // UNIVERSAL FIX 1.5: Quote Boolean Values (yes/no/on/off)
+        // YAML 1.1 interprets yes/no as booleans, but K8s often wants strings for labels/env values
+        const booleanResult = this.fixBooleanQuotes(currentLines);
+        currentLines = booleanResult.lines;
+        if (booleanResult.changes.length > 0) {
+            changes.push(...booleanResult.changes);
+        }
+
+        // UNIVERSAL FIX 1.6: Fix Indentation & Spacing (Aggressive)
+        const indentResult = this.fixIndentation(currentLines);
+        currentLines = indentResult.lines;
+        if (indentResult.changes.length > 0) {
+            changes.push(...indentResult.changes);
         }
 
         // FINAL FIX 10: Detect block scalars FIRST to preserve ConfigMap/Secret content
@@ -1108,27 +1237,65 @@ export class MultiPassFixer {
     }
 
     /**
-     * CRITICAL FIX 2: Field Name Typos
-     * Fixes: meta: -> metadata:, met -> metadata
+     * CRITICAL FIX 2: Field Name Typos & Fuzzy Matching
+     * Fixes: meta: -> metadata:, api213244version -> apiVersion
      */
     private fixFieldNameTypos(line: string, lineNumber: number): { fixedLine: string; change: FixChange } | null {
-        // Universal field name typo detection using FIELD_TYPO_MAP
-        const match = line.match(/^(\s*)([a-zA-Z]+):\s*(.*)$/);
+        // Universal field name typo detection
+        // Regex allows optional colon to catch "key value"
+        const match = line.match(/^(\s*)([a-zA-Z0-9_-]+)(:?)\s*(.*)$/);
         if (!match) return null;
 
-        const [, indent, fieldName, rest] = match;
+        const [, indent, fieldName, colon, rest] = match;
 
-        // Check if this field is a known typo
-        if (FIELD_TYPO_MAP[fieldName]) {
-            const correctField = FIELD_TYPO_MAP[fieldName];
+        // Skip if valid and has colon
+        if (colon && KNOWN_K8S_KEYS.has(fieldName)) return null;
+
+        // SKIP numbers disguised as keys (e.g. "  8080:")
+        if (/^\d+$/.test(fieldName)) return null;
+
+        // SKIP common values that look like keys but aren't (e.g. "nginx" in "image: nginx")
+        // This method runs on the whole line. If line is "image: nginx", matching "image" (valid) returns null above.
+        // It won't match "nginx" because regex anchors to start ^.
+
+        // If colon is missing, we must be VERY careful not to fuzzy match values.
+        // But since we anchored to start of line, we are matching the "key" part.
+        // e.g. "api372637version v1" -> fieldName="api372637version", rest="v1"
+
+        const correctField = this.fuzzyMatchKey(fieldName);
+
+        if (correctField && correctField !== fieldName) {
+            // If we are replacing a "wild" typo, we force a colon.
             const fixedLine = `${indent}${correctField}: ${rest}`;
+
+            // Higher confidence for longer words or small edit distances
+            const dist = this.levenshteinDistance(fieldName, correctField);
+            const confidence = dist === 1 ? 0.95 : (dist < 3 ? 0.90 : 0.85);
+
             return {
                 fixedLine,
                 change: {
                     line: lineNumber,
                     original: line,
                     fixed: fixedLine,
-                    reason: `Fixed field name typo: "${fieldName}" → "${correctField}"`,
+                    reason: `Fixed field name typo (fuzzy match): "${fieldName}" → "${correctField}"`,
+                    type: 'syntax',
+                    confidence,
+                    severity: 'error'
+                }
+            };
+        }
+
+        // Handle "missing colon" for exact matches too (e.g. "kind Pod" -> "kind: Pod")
+        if (!colon && KNOWN_K8S_KEYS.has(fieldName)) {
+            const fixedLine = `${indent}${fieldName}: ${rest}`;
+            return {
+                fixedLine,
+                change: {
+                    line: lineNumber,
+                    original: line,
+                    fixed: fixedLine,
+                    reason: `Added missing colon for known key "${fieldName}"`,
                     type: 'syntax',
                     confidence: 0.99,
                     severity: 'error'
@@ -1220,6 +1387,136 @@ export class MultiPassFixer {
      * CRITICAL FIX 6: Nested Structure Colons
      * Fixes: "word value" -> "word: value" in nested contexts
      */
+    private fixBooleanQuotes(lines: string[]): { lines: string[], changes: FixChange[] } {
+        const changes: FixChange[] = [];
+        const newLines = [...lines];
+
+        for (let i = 0; i < newLines.length; i++) {
+            if (this.blockScalarLines.has(i)) continue;
+
+            const line = newLines[i];
+            // Match: key: yes/no/on/off (case insensitive, YAML 1.1)
+            const match = line.match(/^(\s*[a-zA-Z0-9_-]+:\s+)(yes|no|on|off)(\s*(#.*)?)$/i);
+
+            if (match) {
+                const [, prefix, val, suffix] = match;
+                const fixedLine = `${prefix}"${val}"${suffix || ''}`;
+
+                newLines[i] = fixedLine;
+                changes.push({
+                    line: i + 1,
+                    original: line,
+                    fixed: fixedLine,
+                    reason: `Quoted boolean-like scalar "${val}" to avoid YAML 1.1 parsing issues`,
+                    type: 'syntax',
+                    confidence: 0.95,
+                    severity: 'warning'
+                });
+            }
+        }
+
+        return { lines: newLines, changes };
+    }
+
+    /**
+     * CRITICAL FIX 7: Aggressive Indentation Repair
+     * Forces standard K8s structure alignment (2 spaces)
+     */
+    private fixIndentation(lines: string[]): { lines: string[], changes: FixChange[] } {
+        const changes: FixChange[] = [];
+        const newLines = [...lines];
+
+        // Known structure map (Key -> Expected Indent Level)
+        const KNOWN_LEVELS: Record<string, number> = {
+            'apiVersion': 0,
+            'kind': 0,
+            'metadata': 0,
+            'spec': 0,
+            'status': 0,
+            'data': 0,
+            'binaryData': 0,
+            // Metadata children
+            'name': 1,
+            'namespace': 1,
+            'labels': 1,
+            'annotations': 1,
+            // Spec children (Pod/Deployment/Service)
+            'replicas': 1,
+            'selector': 1,
+            'template': 1, // Deployment
+            'containers': -1,
+            'volumes': -1,
+            'ports': -1,
+            'type': 1,
+        };
+
+        for (let i = 0; i < newLines.length; i++) {
+            if (this.blockScalarLines.has(i)) continue; // Skip block scalars
+
+            let line = newLines[i];
+            const trimmed = line.trim();
+            if (!trimmed || trimmed.startsWith('#')) continue;
+
+            const match = line.match(/^(\s*)([a-zA-Z0-9_-]+)(:?)\s*(.*)$/);
+            if (!match) continue;
+
+            const [, currentIndentSpace, key, colon, val] = match;
+            const currentIndent = currentIndentSpace.length;
+
+            // 1. Fix Extra Spaces in Value (e.g. "key:    value")
+            if (val && val.length > 0) {
+                if (colon && line.includes(key + ':   ')) {
+                    const cleanVal = val.trim();
+                    const fixed = `${currentIndentSpace}${key}: ${cleanVal}`;
+                    newLines[i] = fixed;
+                    changes.push({
+                        line: i + 1,
+                        original: line,
+                        fixed,
+                        reason: 'Removed extra spaces within key-value pair',
+                        type: 'structure', // Fixed type
+                        confidence: 0.9,
+                        severity: 'info'
+                    });
+                    line = fixed; // Update local
+                }
+            }
+
+            // 2. Fix Indentation Level
+            let targetIndent = -1;
+
+            // Is it a known root key?
+            if (KNOWN_LEVELS[key] === 0) {
+                targetIndent = 0;
+            }
+            // Is it a known Level 1 key?
+            else if (KNOWN_LEVELS[key] === 1) {
+                targetIndent = 2;
+            }
+
+            // HEURISTIC: If indentation matches the target, we are good.
+            // If it doesn't, we force it IF explicitly known.
+            if (targetIndent !== -1 && currentIndent !== targetIndent) {
+                // Apply Fix
+                const fixed = `${' '.repeat(targetIndent)}${trimmed}`;
+                newLines[i] = fixed;
+                changes.push({
+                    line: i + 1,
+                    original: line,
+                    fixed,
+                    reason: `Fixed indentation for "${key}" to ${targetIndent} spaces`,
+                    type: 'structure',
+                    confidence: 0.95,
+                    severity: 'warning'
+                });
+                // Update line for subsequent checks
+                line = fixed;
+            }
+        }
+
+        return { lines: newLines, changes };
+    }
+
     private fixNestedColons(line: string, lineNumber: number): { fixedLine: string; change: FixChange } | null {
         // Pattern 1: indented "word value" needs colon (not in list)
         const match = line.match(/^(\s+)([a-zA-Z][a-zA-Z0-9_-]+)\s+([^\s:].*)$/);
@@ -1823,61 +2120,298 @@ export class MultiPassFixer {
     // PASS 2: AST RECONSTRUCTION
     // ==========================================
 
+    /**
+     * Helper: Normalize Enum Values (Case-insensitive fixes)
+     */
+    private normalizeValues(doc: any): FixChange[] {
+        const changes: FixChange[] = [];
+
+        // 1. RESTART POLICY
+        if (doc.spec && doc.spec.restartPolicy) {
+            const val = doc.spec.restartPolicy.toLowerCase();
+            const map: Record<string, string> = { 'always': 'Always', 'onfailure': 'OnFailure', 'never': 'Never' };
+            if (map[val] && doc.spec.restartPolicy !== map[val]) {
+                const old = doc.spec.restartPolicy;
+                doc.spec.restartPolicy = map[val];
+                changes.push({ line: 1, original: old, fixed: map[val], reason: 'Normalized RestartPolicy case', type: 'semantic', confidence: 1, severity: 'warning' });
+            }
+        }
+
+        // 2. IMAGE PULL POLICY
+        const fixContainerPolicy = (c: any) => {
+            if (c.imagePullPolicy) {
+                const val = c.imagePullPolicy.toLowerCase();
+                const map: Record<string, string> = { 'always': 'Always', 'ifnotpresent': 'IfNotPresent', 'never': 'Never' };
+                if (map[val] && c.imagePullPolicy !== map[val]) {
+                    const old = c.imagePullPolicy;
+                    c.imagePullPolicy = map[val];
+                    changes.push({ line: 1, original: old, fixed: map[val], reason: 'Normalized ImagePullPolicy case', type: 'semantic', confidence: 1, severity: 'warning' });
+                }
+            }
+        };
+
+        if (doc.spec && doc.spec.containers) doc.spec.containers.forEach(fixContainerPolicy);
+        if (doc.spec && doc.spec.template && doc.spec.template.spec && doc.spec.template.spec.containers) {
+            doc.spec.template.spec.containers.forEach(fixContainerPolicy);
+        }
+
+        // 3. SERVICE TYPE
+        if (doc.kind === 'Service' && doc.spec && doc.spec.type) {
+            const val = doc.spec.type.toLowerCase();
+            const map: Record<string, string> = { 'clusterip': 'ClusterIP', 'nodeport': 'NodePort', 'loadbalancer': 'LoadBalancer', 'externalname': 'ExternalName' };
+            if (map[val] && doc.spec.type !== map[val]) {
+                const old = doc.spec.type;
+                doc.spec.type = map[val];
+                changes.push({ line: 1, original: old, fixed: map[val], reason: 'Normalized Service Type case', type: 'semantic', confidence: 1, severity: 'warning' });
+            }
+        }
+
+        // 4. PROTOCOL
+        const fixPorts = (ports: any[]) => {
+            if (!ports) return;
+            ports.forEach(p => {
+                if (p.protocol) {
+                    const val = p.protocol.toUpperCase();
+                    if (['TCP', 'UDP', 'SCTP'].includes(val) && p.protocol !== val) {
+                        const old = p.protocol;
+                        p.protocol = val;
+                        changes.push({ line: 1, original: old, fixed: val, reason: 'Normalized Protocol case', type: 'semantic', confidence: 1, severity: 'warning' });
+                    }
+                }
+            });
+        };
+
+        if (doc.spec && doc.spec.ports) fixPorts(doc.spec.ports);
+        if (doc.spec && doc.spec.containers) doc.spec.containers.forEach((c: any) => fixPorts(c.ports));
+
+        return changes;
+    }
+
+    /**
+     * Helper: Upgrade Deprecated APIs
+     */
+    private upgradeDeprecations(doc: any): FixChange[] {
+        const changes: FixChange[] = [];
+
+        // INGRESS: extensions/v1beta1 -> networking.k8s.io/v1
+        if (doc.kind === 'Ingress' && (doc.apiVersion === 'extensions/v1beta1' || doc.apiVersion === 'networking.k8s.io/v1beta1')) {
+            doc.apiVersion = 'networking.k8s.io/v1';
+            changes.push({ line: 1, original: 'extensions/v1beta1', fixed: 'networking.k8s.io/v1', reason: 'Upgraded deprecated Ingress API', type: 'semantic', confidence: 1, severity: 'warning' });
+
+            // Fix backend structure (pathType required, backend.service.name instead of backend.serviceName)
+            if (doc.spec && doc.spec.rules) {
+                doc.spec.rules.forEach((rule: any) => {
+                    if (rule.http && rule.http.paths) {
+                        rule.http.paths.forEach((path: any) => {
+                            if (!path.pathType) {
+                                path.pathType = 'Prefix'; // Default for v1
+                                changes.push({ line: 1, original: '(missing pathType)', fixed: 'pathType: Prefix', reason: 'Added required pathType for Ingress v1', type: 'structure', confidence: 1, severity: 'error' });
+                            }
+                            // Normalize backend
+                            if (path.backend && path.backend.serviceName) {
+                                path.backend.service = {
+                                    name: path.backend.serviceName,
+                                    port: { number: path.backend.servicePort || 80 }
+                                };
+                                delete path.backend.serviceName;
+                                delete path.backend.servicePort;
+                                changes.push({ line: 1, original: 'backend.serviceName', fixed: 'backend.service.name', reason: 'Updated Ingress backend structure', type: 'structure', confidence: 1, severity: 'error' });
+                            }
+                        });
+                    }
+                });
+            }
+        }
+
+        // CRONJOB: batch/v1beta1 -> batch/v1
+        if (doc.kind === 'CronJob' && doc.apiVersion === 'batch/v1beta1') {
+            doc.apiVersion = 'batch/v1';
+            changes.push({ line: 1, original: 'batch/v1beta1', fixed: 'batch/v1', reason: 'Upgraded deprecated CronJob API', type: 'semantic', confidence: 1, severity: 'warning' });
+        }
+
+        return changes;
+    }
+
     private pass2ASTReconstruction(content: string): { content: string; changes: FixChange[] } {
         const changes: FixChange[] = [];
 
         try {
-            // Try to parse the YAML
             const docs = yaml.loadAll(content);
+            let hasChanges = false;
 
             for (let docIndex = 0; docIndex < docs.length; docIndex++) {
-                const doc = docs[docIndex] as any;
+                let doc = docs[docIndex] as any;
                 if (!doc || typeof doc !== 'object') continue;
 
-                const kind = doc.kind;
-                if (!kind || !isKnownKind(kind)) continue;
+                // 1. INFER APIVERSION/KIND IF MISSING
+                let kind = doc.kind;
+                if (!kind) {
+                    // Inference Logic
+                    if (doc.spec && doc.spec.template) kind = 'Deployment';
+                    else if (doc.spec && doc.spec.containers) kind = 'Pod';
+                    else if (doc.data || doc.binaryData) kind = 'ConfigMap';
+                    else kind = 'Pod'; // Default fallback
 
-                const schema = getSchema(kind);
-                if (!schema) continue;
-
-                // Check for misplaced fields and relocate them
-                const relocations = this.findMisplacedFields(doc, schema);
-
-                for (const relocation of relocations) {
+                    doc.kind = kind;
                     changes.push({
-                        line: 0, // We'll need line tracking for real implementation
-                        original: `${relocation.field}: ${JSON.stringify(relocation.value)}`,
-                        fixed: `Moved to ${relocation.targetPath}`,
-                        reason: `Relocated "${relocation.field}" from root to ${relocation.targetPath}`,
-                        type: 'structure',
-                        confidence: 0.75,
-                        severity: 'warning'
+                        line: 1, original: '(missing kind)', fixed: `kind: ${kind}`,
+                        reason: `Injected missing kind "${kind}"`, type: 'structure', confidence: 0.8, severity: 'error'
                     });
-
-                    // Apply the relocation
-                    this.applyRelocation(doc, relocation);
+                    hasChanges = true;
                 }
 
-                // Serialize back to YAML if changes were made
-                if (relocations.length > 0) {
+                // 2. UPGRADE DEPRECATIONS (Before checking apiVersion existence)
+                const upgradeChanges = this.upgradeDeprecations(doc);
+                if (upgradeChanges.length > 0) {
+                    changes.push(...upgradeChanges);
+                    hasChanges = true;
+                }
+
+                if (!doc.apiVersion) {
+                    // Try to use schema default or fallback
+                    doc.apiVersion = 'v1';
+                    // Improve this: simple mapping for common kinds
+                    if (['Deployment', 'StatefulSet', 'DaemonSet', 'ReplicaSet'].includes(kind)) doc.apiVersion = 'apps/v1';
+                    if (['CronJob', 'Job'].includes(kind)) doc.apiVersion = 'batch/v1';
+                    if (['Ingress'].includes(kind)) doc.apiVersion = 'networking.k8s.io/v1';
+                    if (['Service', 'Pod', 'ConfigMap', 'Secret', 'ServiceAccount'].includes(kind)) doc.apiVersion = 'v1';
+
+                    changes.push({
+                        line: 1, original: '(missing apiVersion)', fixed: `apiVersion: ${doc.apiVersion}`,
+                        reason: `Injected missing apiVersion "${doc.apiVersion}"`, type: 'structure', confidence: 0.9, severity: 'error'
+                    });
+                    hasChanges = true;
+                }
+
+                // 3. STRUCTURAL REPAIRS (e.g. Deployment containers at root)
+                if (['Deployment', 'ReplicaSet', 'DaemonSet', 'StatefulSet', 'Job'].includes(kind)) {
+                    // Check if 'containers' exists in spec but NOT in template.spec
+                    // Also check for root containers
+                    if (doc.containers && !doc.spec) {
+                        // Very broken: containers at root
+                        doc.spec = {
+                            template: {
+                                metadata: { labels: { app: 'generated-app' } },
+                                spec: { containers: doc.containers }
+                            },
+                            selector: { matchLabels: { app: 'generated-app' } }
+                        };
+                        delete doc.containers;
+                        changes.push({ line: 1, original: 'containers', fixed: 'spec.template.spec.containers', reason: 'Moved root containers to Deployment structure', type: 'structure', confidence: 0.95, severity: 'error' });
+                        hasChanges = true;
+                    }
+                    else if (doc.spec && doc.spec.containers && !doc.spec.template) {
+                        // Move spec.containers to spec.template.spec.containers
+                        const containers = doc.spec.containers;
+                        delete doc.spec.containers;
+
+                        doc.spec.template = {
+                            metadata: { labels: { app: 'generated-app' } },
+                            spec: { containers: containers }
+                        };
+
+                        // Also ensure selector exists
+                        if (!doc.spec.selector) {
+                            doc.spec.selector = { matchLabels: { app: 'generated-app' } };
+                        }
+
+                        changes.push({
+                            line: 1, original: 'spec.containers', fixed: 'spec.template.spec.containers',
+                            reason: 'Relocated containers to spec.template.spec for workload controller',
+                            type: 'structure', confidence: 0.95, severity: 'error'
+                        });
+                        hasChanges = true;
+                    }
+                }
+
+                // 4. INJECT REQUIRED FIELDS (Placeholders)
+                if (!doc.metadata) {
+                    doc.metadata = {};
+                    changes.push({ line: 1, original: '(missing metadata)', fixed: 'metadata: ...', reason: 'Injected missing metadata', type: 'structure', confidence: 1, severity: 'error' });
+                    hasChanges = true;
+                }
+
+                if (!doc.metadata.name) {
+                    doc.metadata.name = 'changeme-name';
+                    changes.push({ line: 1, original: '(missing name)', fixed: 'name: changeme-name', reason: 'Injected placeholder name', type: 'semantic', confidence: 1, severity: 'error' });
+                    hasChanges = true;
+                }
+
+                // Add namespace 'default' if missing (except for cluster-wide resources)
+                if (!doc.metadata.namespace && !['ClusterRole', 'ClusterRoleBinding', 'Namespace', 'PersistentVolume', 'StorageClass'].includes(kind)) {
+                    doc.metadata.namespace = 'default';
+                    changes.push({ line: 1, original: '(missing namespace)', fixed: 'namespace: default', reason: 'Injected default namespace', type: 'semantic', confidence: 0.9, severity: 'warning' });
+                    hasChanges = true;
+                }
+
+                // Ensure spec exists for workloads/pods
+                if (['Deployment', 'Pod', 'Service', 'StatefulSet', 'DaemonSet', 'Job', 'CronJob'].includes(kind)) {
+                    if (!doc.spec) {
+                        doc.spec = {};
+                        hasChanges = true;
+                    }
+                }
+
+                // Ensure containers exist for Pod/Deployment
+                if (kind === 'Pod') {
+                    if (!doc.spec.containers || doc.spec.containers.length === 0) {
+                        doc.spec.containers = [{ name: 'app', image: 'changeme-image' }];
+                        changes.push({ line: 1, original: '(missing containers)', fixed: 'containers: ...', reason: 'Injected placeholder container', type: 'semantic', confidence: 1, severity: 'error' });
+                        hasChanges = true;
+                    }
+                } else if (['Deployment', 'StatefulSet', 'DaemonSet'].includes(kind)) {
+                    if (!doc.spec.template) {
+                        doc.spec.template = { metadata: { labels: { app: 'generated-app' } }, spec: { containers: [] } };
+                        if (!doc.spec.selector) doc.spec.selector = { matchLabels: { app: 'generated-app' } };
+                        hasChanges = true;
+                    }
+                    if (!doc.spec.template.spec) doc.spec.template.spec = { containers: [] };
+
+                    if (!doc.spec.template.spec.containers || doc.spec.template.spec.containers.length === 0) {
+                        doc.spec.template.spec.containers = [{ name: 'app', image: 'changeme-image' }];
+                        changes.push({ line: 1, original: '(missing containers)', fixed: 'template...containers', reason: 'Injected placeholder container in template', type: 'semantic', confidence: 1, severity: 'error' });
+                        hasChanges = true;
+                    }
+                }
+
+                // 5. NORMALIZE VALUES (Enums, Case)
+                const normChanges = this.normalizeValues(doc);
+                if (normChanges.length > 0) {
+                    changes.push(...normChanges);
+                    hasChanges = true;
+                }
+
+                if (hasChanges) {
                     docs[docIndex] = doc;
                 }
             }
 
-            // Serialize all documents back
-            if (changes.length > 0) {
-                content = docs.map(doc => yaml.dump(doc, { indent: 2, lineWidth: -1 })).join('---\n');
+            if (hasChanges) {
+                // CANONICAL ORDERING
+                content = docs.map(doc => yaml.dump(doc, {
+                    indent: 2,
+                    lineWidth: -1,
+                    sortKeys: (a, b) => {
+                        const order = ['apiVersion', 'kind', 'metadata', 'name', 'namespace', 'labels', 'annotations', 'spec', 'data', 'status'];
+                        const ia = order.indexOf(a);
+                        const ib = order.indexOf(b);
+                        if (ia !== -1 && ib !== -1) return ia - ib;
+                        if (ia !== -1) return -1;
+                        if (ib !== -1) return 1;
+                        return a.localeCompare(b);
+                    }
+                })).join('---\n');
             }
 
         } catch (error) {
-            // If parsing fails, return unchanged
-            // Pass 4 will handle this
+            // parsing failed
         }
 
         this.changes.push(...changes);
         return { content, changes };
     }
 
+    /*
     private findMisplacedFields(doc: any, schema: K8sResourceSchema): Array<{
         field: string;
         value: any;
@@ -1903,7 +2437,9 @@ export class MultiPassFixer {
 
         return relocations;
     }
+    */
 
+    /*
     private applyRelocation(doc: any, relocation: { field: string; value: any; targetPath: string }): void {
         // Remove from current location
         delete doc[relocation.field];
@@ -1928,6 +2464,7 @@ export class MultiPassFixer {
             Object.assign(current[lastPart], relocation.value);
         }
     }
+    */
 
     // ==========================================
     // PASS 3: SEMANTIC VALIDATION

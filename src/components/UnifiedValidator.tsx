@@ -42,7 +42,7 @@ export const UnifiedValidator: React.FC = () => {
 
     const [isValid, setIsValid] = useState(false);
     const [fixEnabled, setFixEnabled] = useState(true);
-    const [theme, setTheme] = useState<'light' | 'dark'>('light');
+    const [theme, setTheme] = useState<'light' | 'dark'>('dark');
     const [showDocumentation, setShowDocumentation] = useState(false);
     const [showConsole, setShowConsole] = useState(false);
     const [consoleTab, setConsoleTab] = useState<'fixes' | 'errors'>('fixes');
