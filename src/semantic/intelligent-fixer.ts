@@ -2476,7 +2476,7 @@ export class MultiPassFixer {
      */
     private cleanupTopLevelMetadataFields(doc: any): FixChange[] {
         const changes: FixChange[] = [];
-        const fieldsToClean = ['name', 'labels', 'annotations', 'namespace'];
+        const fieldsToClean = ['name', 'namespace', 'labels', 'annotations'];
 
         // Ensure metadata exists (it should by now, but just in case)
         if (!doc.metadata) doc.metadata = {};
@@ -2487,37 +2487,24 @@ export class MultiPassFixer {
                 const rootValue = doc[field];
                 const metaValue = doc.metadata[field];
 
-                // Special handling for 'name'
-                if (field === 'name') {
-                    // If metadata.name is placeholder "changeme-name" and root.name is real, use root
-                    if (metaValue === 'changeme-name' && rootValue && rootValue !== 'changeme-name') {
-                        doc.metadata.name = rootValue;
-                        changes.push({
-                            line: 1, original: `name: ${rootValue} (at root)`, fixed: `metadata.name: ${rootValue}`,
-                            reason: 'Promoted root name to metadata (replaced placeholder)', type: 'structure', confidence: 0.98, severity: 'error'
-                        });
-                    }
-                    // Else just delete root name (keep metadata version)
+                // If exists at root but NOT in metadata, move it
+                if (!metaValue && rootValue) {
+                    doc.metadata[field] = rootValue;
+                    changes.push({
+                        line: 1, original: `${field} (at root)`, fixed: `metadata.${field}`,
+                        reason: `Moved root ${field} to metadata`, type: 'structure', confidence: 0.98, severity: 'error'
+                    });
                 }
-                else {
-                    // For labels, annotations, namespace
-                    if (!metaValue && rootValue) {
-                        // Move to metadata
-                        doc.metadata[field] = rootValue;
-                        changes.push({
-                            line: 1, original: `${field} (at root)`, fixed: `metadata.${field}`,
-                            reason: `Moved root ${field} to metadata`, type: 'structure', confidence: 0.98, severity: 'error'
-                        });
-                    }
-                    // If exists in both, we prefer metadata version (per requirements)
-                    // and strictly delete root version.
-                }
+
+                // If exists in both, we prefer metadata version (per requirements)
+                // and strictly delete root version. (Unless it was moved above, in which case we delete it now)
 
                 // DELETE from root
                 delete doc[field];
 
                 // If we deleted it but didn't push a change (i.e. it was duplicative), record a cleanup change
-                if (metaValue) {
+                // Or if we just moved it, we already recorded a change.
+                if (metaValue && rootValue) {
                     changes.push({
                         line: 1, original: `${field} (at root)`, fixed: '(deleted)',
                         reason: `Removed stray root-level ${field} (kept metadata version)`, type: 'structure', confidence: 0.98, severity: 'warning'
@@ -2651,7 +2638,14 @@ export class MultiPassFixer {
                     }
                 }
 
-                // 4. INJECT REQUIRED FIELDS (Placeholders)
+                // 4. CLEANUP STRAY ROOT Fields (Move to metadata BEFORE injection)
+                const cleanupChanges = this.cleanupTopLevelMetadataFields(doc);
+                if (cleanupChanges.length > 0) {
+                    changes.push(...cleanupChanges);
+                    hasChanges = true;
+                }
+
+                // 5. INJECT REQUIRED FIELDS (Placeholders)
                 if (!doc.metadata) {
                     doc.metadata = {};
                     changes.push({ line: 1, original: '(missing metadata)', fixed: 'metadata: ...', reason: 'Injected missing metadata', type: 'structure', confidence: 1, severity: 'error' });
@@ -2701,17 +2695,10 @@ export class MultiPassFixer {
                     }
                 }
 
-                // 5. NORMALIZE VALUES (Enums, Case)
+                // 6. NORMALIZE VALUES (Enums, Case)
                 const normChanges = this.normalizeValues(doc);
                 if (normChanges.length > 0) {
                     changes.push(...normChanges);
-                    hasChanges = true;
-                }
-
-                // 6. CLEANUP STRAY ROOT FIELDS
-                const cleanupChanges = this.cleanupTopLevelMetadataFields(doc);
-                if (cleanupChanges.length > 0) {
-                    changes.push(...cleanupChanges);
                     hasChanges = true;
                 }
 
