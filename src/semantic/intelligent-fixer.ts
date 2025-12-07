@@ -464,6 +464,18 @@ export class MultiPassFixer {
         // const startTime = Date.now(); // Unused
 
         // ==========================================
+        // STEP 0: JUNK REMOVAL
+        // ==========================================
+        const junkResult = this.removeJunkLines(currentContent);
+        currentContent = junkResult.content;
+        // We probably don't need to report "changes" for junk removal in the formal list,
+        // or we can add them if we want verbose reporting.
+        // User asked to REMOVE it. Let's track it as info/warning.
+        if (junkResult.changes.length > 0) {
+            this.changes.push(...junkResult.changes);
+        }
+
+        // ==========================================
         // PASS 1: Syntax Normalization
         // ==========================================
         const pass1Start = Date.now();
@@ -540,6 +552,91 @@ export class MultiPassFixer {
         };
     }
 
+    /**
+     * STEP 0: PRE-PROCESSING JUNK REMOVAL
+     * Removes lines that are clearly not YAML (junk text)
+     */
+    private removeJunkLines(content: string): { content: string; changes: FixChange[] } {
+        const lines = content.split('\n');
+        const validLines: string[] = [];
+        const changes: FixChange[] = [];
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const trimmed = line.trim();
+
+            // Keep empty lines
+            if (trimmed === '') {
+                validLines.push(line);
+                continue;
+            }
+
+            // Keep comments
+            if (trimmed.startsWith('#')) {
+                validLines.push(line);
+                continue;
+            }
+
+            // Keep document separators
+            if (trimmed === '---' || trimmed === '...') {
+                validLines.push(line);
+                continue;
+            }
+
+            // Keep lines with colon (potential key-value)
+            if (line.includes(':')) {
+                validLines.push(line);
+                continue;
+            }
+
+            // Keep list items (start with dash)
+            if (trimmed.startsWith('-')) {
+                validLines.push(line);
+                continue;
+            }
+
+            // HEURISTIC: If it looks like a known key (even without colon), keep it.
+            // Case 1: Single word "met#" -> "metadata"
+            // Case 2: Key value "kind Pod" -> "kind: Pod"
+            const parts = trimmed.split(/\s+/);
+            const firstWord = parts[0];
+
+            if (firstWord && firstWord.length > 2) {
+                // If it is a known key, definitely keep it
+                if (this.fuzzyMatchKey(firstWord)) {
+                    validLines.push(line);
+                    continue;
+                }
+
+                // If it is exactly TWO words (e.g. "app web", "name DEBUG"), keep it IF:
+                // 1. It is INDENTED (likely a nested key)
+                // 2. OR matches a known key (handled above)
+                // This filters out "random junk" at root level which is usually not indented.
+                if (parts.length === 2) {
+                    const indent = line.search(/\S/);
+                    if (indent > 0) {
+                        validLines.push(line);
+                        continue;
+                    }
+                }
+            }
+
+            // If we reached here, it's junk
+            changes.push({
+                line: i + 1,
+                original: line,
+                fixed: '(removed)',
+                reason: 'Removed junk text line (not YAML)',
+                type: 'syntax',
+                confidence: 1.0,
+                severity: 'warning'
+            });
+            // Do NOT push to validLines
+        }
+
+        return { content: validLines.join('\n'), changes };
+    }
+
     // ==========================================
     // PASS 1: SYNTAX NORMALIZATION
     // ==========================================
@@ -581,6 +678,10 @@ export class MultiPassFixer {
 
         const fixedLines: string[] = [];
 
+        // Context tracking stack: { indent: number, key: string }[]
+        // Used to determine if we are inside "labels", "env", etc.
+        const contextStack: { indent: number, key: string }[] = [];
+
         for (let i = 0; i < currentLines.length; i++) {
             const lineNumber = i + 1;
             let line = currentLines[i];
@@ -606,12 +707,43 @@ export class MultiPassFixer {
                 unclosedQuoteCount++;
             }
 
-            // CRITICAL FIX 2: Field Name Typos (meta: -> metadata:)
-            const fieldTypoResult = this.fixFieldNameTypos(line, lineNumber);
+            // =====================================
+            // CONTEXT TRACKING LOGIC
+            // =====================================
+            const indentLevel = this.getIndent(line);
+
+            // Pop stack if indentation decreased or stays same (sibling)
+            // But be careful: if it stays same, we pop the *previous* sibling, but we are still children of the parent above.
+            // Actually, we want to know the PARENT of the current line.
+            // If indentLevel > stack.top.indent, then stack.top is the parent.
+            // If indentLevel <= stack.top.indent, we pop until we find a parent with indent < indentLevel.
+
+            while (contextStack.length > 0 && indentLevel <= contextStack[contextStack.length - 1].indent) {
+                contextStack.pop();
+            }
+
+            const currentParent = contextStack.length > 0 ? contextStack[contextStack.length - 1].key : null;
+
+            // =====================================
+            // CRITICAL FIX 2: Field Name Typos & Missing Colons
+            // =====================================
+            // Now passing currentParent to help identifying nested keys
+            const fieldTypoResult = this.fixFieldNameTypos(line, lineNumber, currentParent);
             if (fieldTypoResult) {
                 changes.push(fieldTypoResult.change);
                 line = fieldTypoResult.fixedLine;
                 typoCount++;
+            }
+
+            // Update Stack if the (potentially fixed) line is a parent key
+            // Matches "key:" or "key: value" (we only care that it IS a key)
+            // But we only push if it expects children or is a known parent.
+            // Actually, just push any key. The pop logic handles the hierarchy.
+            const keyMatch = line.match(/^(\s*)([a-zA-Z0-9_-]+)(:)/);
+            if (keyMatch) {
+                const key = keyMatch[2];
+                // We track it.
+                contextStack.push({ indent: indentLevel, key });
             }
 
             // CRITICAL FIX 3: Complete Word Number Conversion
@@ -1309,14 +1441,35 @@ export class MultiPassFixer {
      * CRITICAL FIX 2: Field Name Typos & Fuzzy Matching
      * Fixes: meta: -> metadata:, api213244version -> apiVersion, api!Version -> apiVersion
      */
-    private fixFieldNameTypos(line: string, lineNumber: number): { fixedLine: string; change: FixChange } | null {
+    private fixFieldNameTypos(line: string, lineNumber: number, parentContext: string | null = null): { fixedLine: string; change: FixChange } | null {
         // Universal field name typo detection
         // Regex allows optional colon, and captures ANY non-space non-colon chars as key
         // Supports partial list prefix "- "
-        const match = line.match(/^(\s*-?\s*)([^\s:]+)(:?)\s*(.*)$/);
+        // Also supports "Key Value" pattern (missing colon) via greedy rest capture, but we need to split it manually if no colon found.
+
+        let match = line.match(/^(\s*-?\s*)([^\s:]+)(:?)\s*(.*)$/);
+
+        // If no match normally, checking for "Indent Key Value" pattern (no colon)
         if (!match) return null;
 
-        const [, indent, fieldName, colon, rest] = match;
+        let [, indent, fieldName, colon, rest] = match;
+
+        // Context-aware aggressive fix for missing colons
+        // If we are in a known map/list context, assume "Key Value" is "Key: Value"
+        if (!colon && parentContext && ['labels', 'annotations', 'data', 'env', 'ports', 'matchLabels', 'selector', 'resources', 'limits', 'requests'].includes(parentContext)) {
+            // If fieldName is just a word, and rest exists, likely "Key Value"
+            // Ensure fieldName is not a known keyword that shouldn't be a key here? (Unlikely)
+            // We just add colon.
+            if (fieldName && rest && !fieldName.includes(':')) {
+                colon = ':';
+                // We proceed to normalization logic below using this assumed colon
+            }
+        }
+
+        // ignore comments
+        if (fieldName.startsWith('#')) return null;
+
+        // ... existing logic ...
 
         // Skip if valid and has colon
         if (colon && KNOWN_K8S_KEYS.has(fieldName)) return null;
@@ -1510,11 +1663,13 @@ export class MultiPassFixer {
             'status': 0,
             'data': 0,
             'binaryData': 0,
-            // Metadata children
-            'name': 1,
-            'namespace': 1,
-            'labels': 1,
-            'annotations': 1,
+            // Metadata children - REMOVED because they can appear nested (e.g. env name, pod selector labels)
+            // 'name': 1,
+            // 'namespace': 1,
+            // 'labels': 1,
+            // 'annotations': 1
+            // 'labels': 1,
+            // 'annotations': 1,
             // Spec children (Pod/Deployment/Service)
             'replicas': 1,
             'selector': 1,
