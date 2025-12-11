@@ -1,53 +1,84 @@
 import React, { useState, useEffect } from 'react';
-import MenuBookIcon from '@mui/icons-material/MenuBook';
-import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
-import LoopIcon from '@mui/icons-material/Loop';
-import BuildIcon from '@mui/icons-material/Build';
-import PsychologyIcon from '@mui/icons-material/Psychology';
-import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
-import AnalyticsIcon from '@mui/icons-material/Analytics';
-import CloudIcon from '@mui/icons-material/Cloud';
-import VerifiedIcon from '@mui/icons-material/Verified';
-import WarningIcon from '@mui/icons-material/Warning';
-import TerminalIcon from '@mui/icons-material/Terminal';
-import ApiIcon from '@mui/icons-material/Api';
-import AccountTreeIcon from '@mui/icons-material/AccountTree';
-import HelpIcon from '@mui/icons-material/Help';
-import SearchIcon from '@mui/icons-material/Search';
-import SpeedIcon from '@mui/icons-material/Speed';
-import SecurityIcon from '@mui/icons-material/Security';
-import DescriptionIcon from '@mui/icons-material/Description';
-import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
-import ErrorIcon from '@mui/icons-material/Error';
-import CodeIcon from '@mui/icons-material/Code';
-import StorageIcon from '@mui/icons-material/Storage';
-import LockIcon from '@mui/icons-material/Lock';
-import HealthAndSafetyIcon from '@mui/icons-material/HealthAndSafety';
-import ScaleIcon from '@mui/icons-material/Scale';
+import {
+    Box,
+    Typography,
+    IconButton,
+    InputBase,
+    Divider,
+    Paper,
+    List,
+    ListItemButton,
+    ListItemIcon,
+    ListItemText,
+    Grid,
+    Chip,
+    useTheme,
+    alpha,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow
+} from '@mui/material';
+import {
+    MenuBook as OverviewIcon,
+    RocketLaunch as QuickStartIcon,
+    Loop as PipelineIcon,
+    Build as FixerIcon,
+    Psychology as SemanticIcon,
+    LibraryBooks as KnowledgeIcon,
+    Analytics as ConfidenceIcon,
+    Terminal as CliIcon,
+    Api as ApiIcon,
+    AccountTree as ArchitectureIcon,
+    Help as FaqIcon,
+    Search as SearchIcon,
+    Close as CloseIcon,
+    Speed as SpeedIcon,
+    Security as SecurityIcon,
+    AutoFixHigh as AutoFixIcon,
+    CheckCircle as CheckIcon,
+    Storage as StorageIcon,
+    TouchApp as InterfaceIcon,
+    Settings as BackendIcon,
+    UploadFile as UploadIcon,
+    Policy as RegoIcon,
+    PlayArrow as ValidateIcon,
+    Terminal as ConsoleIcon,
+    Code as CodeIcon,
+    Palette as DesignIcon,
+    BugReport as TestIcon,
+    Tune as ConfigIcon,
+    DataObject as ExamplesIcon
+} from '@mui/icons-material';
 
 interface DocumentationProps {
     onClose?: () => void;
 }
 
 export const Documentation: React.FC<DocumentationProps> = ({ onClose }) => {
+    const theme = useTheme();
     const [activeSection, setActiveSection] = useState('overview');
     const [searchQuery, setSearchQuery] = useState('');
+    const isDarkMode = theme.palette.mode === 'dark';
 
     const sections = [
-        { id: 'overview', title: 'Overview', icon: <MenuBookIcon fontSize="small" /> },
-        { id: 'quickstart', title: 'Quick Start', icon: <RocketLaunchIcon fontSize="small" /> },
-        { id: 'validation-pipeline', title: 'Validation Pipeline', icon: <LoopIcon fontSize="small" /> },
-        { id: 'yaml-fixer', title: 'YAML Fixer Engine', icon: <BuildIcon fontSize="small" /> },
-        { id: 'semantic-engine', title: 'Semantic Engine', icon: <PsychologyIcon fontSize="small" /> },
-        { id: 'knowledge-base', title: 'Knowledge Base', icon: <LibraryBooksIcon fontSize="small" /> },
-        { id: 'confidence-system', title: 'Confidence System', icon: <AnalyticsIcon fontSize="small" /> },
-        { id: 'supported-resources', title: 'Supported Resources', icon: <CloudIcon fontSize="small" /> },
-        { id: 'best-practices', title: 'Best Practices', icon: <VerifiedIcon fontSize="small" /> },
-        { id: 'error-reference', title: 'Error Reference', icon: <WarningIcon fontSize="small" /> },
-        { id: 'cli-usage', title: 'CLI Usage', icon: <TerminalIcon fontSize="small" /> },
-        { id: 'api-reference', title: 'API Reference', icon: <ApiIcon fontSize="small" /> },
-        { id: 'architecture', title: 'Architecture', icon: <AccountTreeIcon fontSize="small" /> },
-        { id: 'faq', title: 'FAQ', icon: <HelpIcon fontSize="small" /> },
+        { id: 'overview', title: 'Overview', icon: <OverviewIcon fontSize="small" /> },
+        { id: 'features', title: 'Key Features', icon: <CheckIcon fontSize="small" /> },
+        { id: 'validation-pipeline', title: '10-Stage Pipeline', icon: <PipelineIcon fontSize="small" /> },
+        { id: 'semantic-validator', title: 'Semantic Validator', icon: <SemanticIcon fontSize="small" /> },
+        { id: 'fixer-architecture', title: '5-Pass Fixer', icon: <FixerIcon fontSize="small" /> },
+        { id: 'type-registry', title: 'Type Registry', icon: <KnowledgeIcon fontSize="small" /> },
+        { id: 'cli-tool', title: 'CLI Tool', icon: <CliIcon fontSize="small" /> },
+        { id: 'architecture', title: 'Architecture', icon: <ArchitectureIcon fontSize="small" /> },
+        { id: 'api-reference', title: 'API Endpoints', icon: <ApiIcon fontSize="small" /> },
+        { id: 'usage', title: 'Usage Guide', icon: <InterfaceIcon fontSize="small" /> },
+        { id: 'configuration', title: 'Configuration', icon: <ConfigIcon fontSize="small" /> },
+        { id: 'examples', title: 'Real-World Examples', icon: <ExamplesIcon fontSize="small" /> },
+        { id: 'performance', title: 'Performance', icon: <SpeedIcon fontSize="small" /> },
+        { id: 'project-structure', title: 'Project Structure', icon: <CodeIcon fontSize="small" /> },
+        { id: 'design-system', title: 'Design System', icon: <DesignIcon fontSize="small" /> },
     ];
 
     const scrollToSection = (id: string) => {
@@ -84,510 +115,531 @@ export const Documentation: React.FC<DocumentationProps> = ({ onClose }) => {
         s.title.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
+    // Styles
+    const headingStyle = {
+        fontWeight: 700,
+        color: isDarkMode ? '#FFFFFF' : '#202124',
+        mb: 2,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1.5,
+    };
+
+    const subHeadingStyle = {
+        fontWeight: 600,
+        color: isDarkMode ? '#e0e0e0' : '#333',
+        mb: 1.5,
+        mt: 3
+    };
+
+    const paragraphStyle = {
+        color: 'text.secondary',
+        mb: 2,
+        lineHeight: 1.6,
+        fontSize: '15px'
+    };
+
+    const cardStyle = {
+        p: 3,
+        borderRadius: '16px',
+        bgcolor: isDarkMode ? 'rgba(255, 255, 255, 0.03)' : '#FFFFFF',
+        border: `1px solid ${isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)'}`,
+        height: '100%',
+    };
+
+    const codeBlockStyle = {
+        p: 2,
+        borderRadius: '8px',
+        bgcolor: isDarkMode ? '#0d0d0d' : '#f5f7f9',
+        color: isDarkMode ? '#e6edf3' : '#24292f',
+        fontFamily: 'JetBrains Mono, "Fira Code", monospace',
+        fontSize: '13px',
+        overflowX: 'auto',
+        border: `1px solid ${isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0,0,0,0.05)'}`,
+        whiteSpace: 'pre',
+        mb: 2
+    };
+
+    const SectionWrapper = ({ id, children }: { id: string, children: React.ReactNode }) => (
+        <Box id={id} sx={{ scrollMarginTop: 100, mb: 8 }}>
+            {children}
+            <Divider sx={{ mt: 6, opacity: 0.5 }} />
+        </Box>
+    );
+
     return (
-        <div className="flex w-full h-full bg-[var(--color-bg-primary)] overflow-hidden animate-fade-in-soft">
+        <Box sx={{
+            display: 'flex',
+            width: '100%',
+            height: '100%',
+            bgcolor: isDarkMode ? '#121212' : '#F9FAFB',
+            overflow: 'hidden',
+        }}>
             {/* Sidebar */}
-            <aside className="w-72 flex-shrink-0 border-r border-[var(--color-border)]/50 bg-[var(--color-bg-secondary)]/50 backdrop-blur-sm overflow-y-auto">
-                <div className="p-5 space-y-4">
-                    <div className="px-2 pb-4 border-b border-[var(--color-border)]/30">
-                        <div className="flex items-center justify-between mb-2">
-                            <h2 className="text-xl font-extrabold text-[var(--color-text-primary)]">Podscribe</h2>
-                            {onClose && (
-                                <button
-                                    onClick={onClose}
-                                    className="p-1.5 rounded-lg text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
-                                    title="Back to Editor"
-                                >
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
-                            )}
-                        </div>
-                        <p className="text-[11px] text-[var(--color-text-tertiary)]">Documentation v2.0</p>
-                    </div>
-                    <div className="relative">
-                        <input
-                            type="text"
+            <Paper
+                elevation={0}
+                sx={{
+                    width: 280,
+                    flexShrink: 0,
+                    borderRight: `1px solid ${isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
+                    bgcolor: isDarkMode ? '#1E1E1E' : '#FFFFFF',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    zIndex: 2,
+                }}
+            >
+                <Box sx={{ p: 3, borderBottom: `1px solid ${isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}` }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                        <Typography variant="h6" fontWeight={800} sx={{ background: 'linear-gradient(45deg, #1A73E8, #8AB4F8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                            Podscribe
+                        </Typography>
+                        {onClose && (
+                            <IconButton onClick={onClose} size="small">
+                                <CloseIcon fontSize="small" />
+                            </IconButton>
+                        )}
+                    </Box>
+                    <Typography variant="caption" color="text.secondary">Documentation v2.0</Typography>
+                </Box>
+
+                <Box sx={{ p: 2 }}>
+                    <Box sx={{
+                        position: 'relative',
+                        borderRadius: '8px',
+                        bgcolor: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
+                        '&:hover': { bgcolor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)' },
+                    }}>
+                        <Box sx={{ position: 'absolute', left: 10, top: 9, color: 'text.secondary' }}>
+                            <SearchIcon sx={{ fontSize: 18 }} />
+                        </Box>
+                        <InputBase
                             placeholder="Search docs..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full px-3 py-2 pl-9 text-sm bg-[var(--color-bg-primary)] border border-[var(--color-border)]/50 rounded-lg text-[var(--color-text-primary)] placeholder:text-[var(--color-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-blue)]/30"
+                            sx={{ pl: 5, pr: 2, py: 0.5, width: '100%', fontSize: '14px' }}
                         />
-                        <SearchIcon className="absolute left-3 top-2.5 w-4 h-4 text-[var(--color-text-tertiary)]" style={{ fontSize: 16 }} />
-                    </div>
-                    <nav className="space-y-0.5">
-                        {filteredSections.map((section) => (
-                            <button
-                                key={section.id}
-                                onClick={() => scrollToSection(section.id)}
-                                className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2.5 btn-press ${activeSection === section.id
-                                    ? 'bg-[var(--color-blue)] text-white shadow-md'
-                                    : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)]'
-                                    }`}
-                            >
+                    </Box>
+                </Box>
+
+                <List sx={{ flex: 1, overflowY: 'auto', px: 2, pb: 2 }}>
+                    {filteredSections.map((section) => (
+                        <ListItemButton
+                            key={section.id}
+                            onClick={() => scrollToSection(section.id)}
+                            selected={activeSection === section.id}
+                            sx={{
+                                borderRadius: '8px',
+                                mb: 0.5,
+                                '&.Mui-selected': {
+                                    bgcolor: isDarkMode ? 'rgba(138, 180, 248, 0.15)' : 'rgba(26, 115, 232, 0.1)',
+                                    color: isDarkMode ? '#8AB4F8' : '#1A73E8',
+                                    '& .MuiListItemIcon-root': { color: isDarkMode ? '#8AB4F8' : '#1A73E8' },
+                                },
+                            }}
+                        >
+                            <ListItemIcon sx={{ minWidth: 32, color: 'text.secondary' }}>
                                 {section.icon}
-                                {section.title}
-                            </button>
-                        ))}
-                    </nav>
-                </div>
-            </aside>
+                            </ListItemIcon>
+                            <ListItemText
+                                primary={section.title}
+                                primaryTypographyProps={{ fontSize: '13px', fontWeight: 500 }}
+                            />
+                        </ListItemButton>
+                    ))}
+                </List>
+            </Paper>
 
             {/* Main Content */}
-            <div id="docs-content" className="flex-1 overflow-y-auto scroll-smooth">
-                <div className="max-w-4xl mx-auto px-10 py-10 space-y-16">
+            <Box
+                id="docs-content"
+                sx={{
+                    flex: 1,
+                    overflowY: 'auto',
+                    scrollBehavior: 'smooth',
+                    height: '100%',
+                }}
+            >
+                <Box sx={{ maxWidth: 960, mx: 'auto', px: 6, py: 8 }}>
 
                     {/* OVERVIEW */}
-                    <section id="overview" className="scroll-mt-10 space-y-6">
-                        <div className="flex items-center gap-3">
-                            <MenuBookIcon className="text-[var(--color-blue)]" />
-                            <h1 className="text-3xl font-extrabold text-[var(--color-text-primary)]">Overview</h1>
-                        </div>
-                        <p className="text-[var(--color-text-secondary)] text-lg">
-                            Podscribe is a production-grade Kubernetes YAML linter and fixer with a 9-stage validation pipeline, semantic intelligence, and automatic error correction.
-                        </p>
-                        <div className="grid grid-cols-4 gap-4">
-                            {[
-                                { label: 'Validation Stages', value: '9' },
-                                { label: 'Known Fields', value: '150+' },
-                                { label: 'Fix Types', value: '8' },
-                                { label: 'K8s Resources', value: '24+' }
-                            ].map((stat) => (
-                                <div key={stat.label} className="p-4 rounded-xl bg-[var(--color-bg-tertiary)] border border-[var(--color-border)]/50">
-                                    <div className="text-2xl font-bold text-[var(--color-text-primary)]">{stat.value}</div>
-                                    <div className="text-xs text-[var(--color-text-tertiary)]">{stat.label}</div>
-                                </div>
-                            ))}
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            {[
-                                { title: 'Real-Time Validation', desc: '500ms debounce for instant feedback', icon: <SpeedIcon /> },
-                                { title: 'Schema Validation', desc: 'Kubernetes API v1.29 schemas', icon: <VerifiedIcon /> },
-                                { title: 'Auto-Fix Engine', desc: '3-phase fixing with confidence scoring', icon: <AutoFixHighIcon /> },
-                                { title: 'Security Checks', desc: 'Privileged containers, host network', icon: <SecurityIcon /> },
-                                { title: 'Multi-Document', desc: 'Multiple YAML documents in one file', icon: <DescriptionIcon /> },
-                                { title: 'Semantic Intelligence', desc: 'Context-aware typo correction', icon: <PsychologyIcon /> },
-                            ].map((f) => (
-                                <div key={f.title} className="p-4 bg-[var(--color-bg-card)] border border-[var(--color-border)]/50 rounded-xl flex gap-3">
-                                    <div className="text-[var(--color-blue)]">{f.icon}</div>
-                                    <div>
-                                        <h3 className="font-bold text-[var(--color-text-primary)]">{f.title}</h3>
-                                        <p className="text-sm text-[var(--color-text-secondary)]">{f.desc}</p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </section>
+                    <SectionWrapper id="overview">
+                        <Typography variant="h3" sx={headingStyle}>
+                            <OverviewIcon sx={{ color: '#1A73E8', fontSize: 36 }} /> Overview
+                        </Typography>
+                        <Typography variant="body1" sx={{ fontSize: '18px', mb: 3, lineHeight: 1.6, color: 'text.secondary' }}>
+                            Podscribe is a powerful, intelligent web application for validating and automatically fixing Kubernetes YAML manifests with semantic understanding.
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 1, mb: 4 }}>
+                            <Chip label="v1.0.0" size="small" color="primary" />
+                            <Chip label="MIT License" size="small" color="success" />
+                            <Chip label="TypeScript 5.6" size="small" color="info" />
+                            <Chip label="React 18" size="small" color="info" />
+                        </Box>
+                    </SectionWrapper>
 
-                    {/* QUICK START */}
-                    <section id="quickstart" className="scroll-mt-10 space-y-6">
-                        <div className="flex items-center gap-3">
-                            <RocketLaunchIcon className="text-[var(--color-blue)]" />
-                            <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">Quick Start</h2>
-                        </div>
-                        <div className="space-y-4">
+                    {/* FEATURES */}
+                    <SectionWrapper id="features">
+                        <Typography variant="h4" sx={headingStyle}>
+                            <CheckIcon sx={{ color: '#1A73E8' }} /> Key Features
+                        </Typography>
+                        <Grid container spacing={3}>
                             {[
-                                { step: 1, title: 'Paste Your YAML', desc: 'Copy your Kubernetes manifest into the left editor panel' },
-                                { step: 2, title: 'Real-time Validation', desc: 'See instant feedback as you type (500ms debounce)' },
-                                { step: 3, title: 'Review Results', desc: 'Check errors (red) and warnings (orange) in the console panel' },
-                                { step: 4, title: 'Auto-Fix', desc: 'Enable Auto-Fix toggle for automatic error correction' },
-                            ].map((item) => (
-                                <div key={item.step} className="flex gap-4 items-start">
-                                    <div className="flex-shrink-0 w-8 h-8 bg-[var(--color-blue)] text-white rounded-full flex items-center justify-center text-sm font-bold">{item.step}</div>
-                                    <div>
-                                        <h4 className="font-bold text-[var(--color-text-primary)]">{item.title}</h4>
-                                        <p className="text-sm text-[var(--color-text-secondary)]">{item.desc}</p>
-                                    </div>
-                                </div>
+                                { title: '10-Stage Pipeline', desc: 'Production-grade validation system processes YAML through 10 comprehensive stages.' },
+                                { title: 'Semantic Intelligence', desc: 'Understands Kubernetes YAML structure semantically, not just through pattern matching.' },
+                                { title: '5-Pass Repair', desc: 'Multi-pass fixing with 95%+ accuracy for complex structural issues.' },
+                                { title: 'Context-Aware', desc: 'Intelligently detects missing colons using 150+ known K8s fields.' },
+                                { title: 'Fuzzy Matching', desc: 'Auto-corrects 80+ common typos like "contaienrs" or "metdata".' },
+                                { title: 'Type Coercion', desc: 'Converts words to numbers ("three" -> 3) and handles boolean strings.' },
+                            ].map((item, idx) => (
+                                <Grid item xs={12} md={6} key={idx}>
+                                    <Paper elevation={0} sx={cardStyle}>
+                                        <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>{item.title}</Typography>
+                                        <Typography variant="body2" color="text.secondary">{item.desc}</Typography>
+                                    </Paper>
+                                </Grid>
                             ))}
-                        </div>
-                        <div className="bg-[var(--color-bg-tertiary)] rounded-xl border border-[var(--color-border)]/50 overflow-hidden">
-                            <div className="px-4 py-2 bg-[var(--color-bg-secondary)] border-b border-[var(--color-border)]/30 flex items-center gap-2">
-                                <CodeIcon style={{ fontSize: 14 }} className="text-[var(--color-text-tertiary)]" />
-                                <span className="text-xs font-semibold text-[var(--color-text-secondary)]">Example: Valid Deployment</span>
-                            </div>
-                            <pre className="p-4 text-sm font-mono text-[var(--color-text-secondary)] overflow-x-auto">{`apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: nginx-deployment
-  labels:
-    app: nginx
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: nginx
-  template:
-    metadata:
-      labels:
-        app: nginx
-    spec:
-      containers:
-      - name: nginx
-        image: nginx:1.21.6
-        ports:
-        - containerPort: 80
-        resources:
-          requests:
-            memory: "64Mi"
-            cpu: "250m"
-          limits:
-            memory: "128Mi"
-            cpu: "500m"
-        livenessProbe:
-          httpGet:
-            path: /
-            port: 80
-          initialDelaySeconds: 30`}</pre>
-                        </div>
-                    </section>
+                        </Grid>
+                    </SectionWrapper>
 
                     {/* VALIDATION PIPELINE */}
-                    <section id="validation-pipeline" className="scroll-mt-10 space-y-6">
-                        <div className="flex items-center gap-3">
-                            <LoopIcon className="text-[var(--color-blue)]" />
-                            <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">Validation Pipeline</h2>
-                        </div>
-                        <p className="text-[var(--color-text-secondary)]">9-stage validation ensuring production-ready manifests.</p>
-                        <div className="space-y-3">
+                    <SectionWrapper id="validation-pipeline">
+                        <Typography variant="h4" sx={headingStyle}>
+                            <PipelineIcon sx={{ color: '#1A73E8' }} /> 10-Stage Validation Pipeline
+                        </Typography>
+                        <Typography sx={paragraphStyle}>Our production-grade validation system processes YAML through 10 comprehensive stages:</Typography>
+
+                        <Paper elevation={0} sx={{ ...cardStyle, p: 0, overflow: 'hidden', mb: 3 }}>
+                            <TableContainer>
+                                <Table size="small">
+                                    <TableHead sx={{ bgcolor: isDarkMode ? 'rgba(255,255,255,0.05)' : '#f5f5f5' }}>
+                                        <TableRow>
+                                            <TableCell sx={{ color: 'text.secondary', fontWeight: 700 }}>Stage</TableCell>
+                                            <TableCell sx={{ color: 'text.secondary', fontWeight: 700 }}>Name</TableCell>
+                                            <TableCell sx={{ color: 'text.secondary', fontWeight: 700 }}>Purpose</TableCell>
+                                            <TableCell sx={{ color: 'text.secondary', fontWeight: 700 }}>File</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {[
+                                            { id: 0, name: 'Context', purpose: 'Load config, gather files', file: 'stage0-context.ts' },
+                                            { id: 1, name: 'Render', purpose: 'Template rendering (Helm/Kustomize)', file: 'stage1-render.ts' },
+                                            { id: 2, name: 'Parse', purpose: 'Parse YAML to AST, syntax checks', file: 'stage2-parse.ts' },
+                                            { id: 3, name: 'Schema', purpose: 'Validate against K8s schemas', file: 'stage3-schema.ts' },
+                                            { id: 4, name: 'Graph', purpose: 'Build dependency graph', file: 'stage4-graph.ts' },
+                                            { id: 5, name: 'Checks', purpose: 'Static security & best practices', file: 'stage5-checks.ts' },
+                                            { id: 6, name: 'Admission', purpose: 'Simulate admission webhooks', file: 'stage6-admission.ts' },
+                                            { id: 7, name: 'Policy', purpose: 'OPA/Rego policy enforcement', file: 'stage7-policy.ts' },
+                                            { id: 8, name: 'Server', purpose: 'Dry-run against K8s API server', file: 'stage8-server.ts' },
+                                            { id: 9, name: 'Indent', purpose: 'Dedicated indentation validator', file: 'indentation-validator.ts' },
+                                        ].map((row) => (
+                                            <TableRow key={row.id}>
+                                                <TableCell sx={{ fontWeight: 700 }}>{row.id}</TableCell>
+                                                <TableCell>{row.name}</TableCell>
+                                                <TableCell color="text.secondary">{row.purpose}</TableCell>
+                                                <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{row.file}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        </Paper>
+                    </SectionWrapper>
+
+                    {/* SEMANTIC VALIDATOR */}
+                    <SectionWrapper id="semantic-validator">
+                        <Typography variant="h4" sx={headingStyle}>
+                            <SemanticIcon sx={{ color: '#1A73E8' }} /> Intelligent Semantic Validator
+                        </Typography>
+                        <Typography sx={paragraphStyle}>
+                            Our next-generation validator understands Kubernetes YAML structure semantically, not just through pattern matching.
+                        </Typography>
+                        <List>
+                            <ListItemButton><ListItemText primary="✅ 5-Pass Repair Pipeline" secondary="Multi-pass fixing with 95%+ accuracy" /></ListItemButton>
+                            <Divider component="li" />
+                            <ListItemButton><ListItemText primary="✅ Context-Aware Key Detection" secondary="Detects missing colons based on 150+ known K8s fields" /></ListItemButton>
+                            <Divider component="li" />
+                            <ListItemButton><ListItemText primary="✅ Fuzzy Field Name Matching" secondary="Auto-corrects 80+ common typos using Levenshtein distance" /></ListItemButton>
+                            <Divider component="li" />
+                            <ListItemButton><ListItemText primary="✅ Type Awareness & Coercion" secondary="Converts values to expected types with 100+ field definitions" /></ListItemButton>
+                        </List>
+                    </SectionWrapper>
+
+                    {/* FIXER ARCHITECTURE */}
+                    <SectionWrapper id="fixer-architecture">
+                        <Typography variant="h4" sx={headingStyle}>
+                            <FixerIcon sx={{ color: '#1A73E8' }} /> 5-Pass Fixer Architecture
+                        </Typography>
+                        <Typography sx={paragraphStyle}>
+                            Core Logic: <code>intelligent-fixer.ts</code> (3,334 lines, 73 functions)
+                        </Typography>
+
+                        <Grid container spacing={2} sx={{ mt: 2 }}>
                             {[
-                                { stage: 0, name: 'Environment Context', file: 'stage0-context.ts', desc: 'Detects environment (dev/staging/prod) from namespace and labels.' },
-                                { stage: 1, name: 'Helm/Kustomize Rendering', file: 'stage1-render.ts', desc: 'Renders Helm charts or Kustomize overlays if detected.' },
-                                { stage: 2, name: 'YAML Parse', file: 'stage2-parse.ts', desc: 'Parses YAML with js-yaml. Handles multi-document files.' },
-                                { stage: 3, name: 'Schema Validation', file: 'stage3-schema.ts', desc: 'Validates against K8s API schemas using AJV.' },
-                                { stage: 4, name: 'Graph Analysis', file: 'stage4-graph.ts', desc: 'Analyzes Service→Pod matching, ConfigMap refs.' },
-                                { stage: 5, name: 'Static Checks', file: 'stage5-checks.ts', desc: 'Resource limits, probes, image tags, security.' },
-                                { stage: 6, name: 'Admission Simulation', file: 'stage6-admission.ts', desc: 'Pod Security Standards (PSS) checks.' },
-                                { stage: 7, name: 'Policy Evaluation', file: 'stage7-policy.ts', desc: 'Custom Kyverno-style ClusterPolicies.' },
-                                { stage: 8, name: 'Server Validation', file: 'stage8-server.ts', desc: 'Optional kubectl --dry-run=server.' },
-                            ].map((item) => (
-                                <div key={item.stage} className="flex gap-4 p-4 bg-[var(--color-bg-card)] border border-[var(--color-border)]/50 rounded-xl">
-                                    <div className="flex-shrink-0 w-10 h-10 bg-[var(--color-blue)]/10 text-[var(--color-blue)] rounded-lg flex items-center justify-center font-bold">{item.stage}</div>
-                                    <div>
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <h4 className="font-bold text-[var(--color-text-primary)]">{item.name}</h4>
-                                            <code className="text-[10px] px-1.5 py-0.5 bg-[var(--color-bg-tertiary)] text-[var(--color-text-tertiary)] rounded">{item.file}</code>
-                                        </div>
-                                        <p className="text-sm text-[var(--color-text-secondary)]">{item.desc}</p>
-                                    </div>
-                                </div>
+                                { pass: 'Pass 1', name: 'Syntax Normalization', desc: 'Fix missing colons, add spaces, normalize quotes and indentation.' },
+                                { pass: 'Pass 2', name: 'AST Reconstruction', desc: 'Parse YAML to AST, identify structure, relocate misplaced nodes.' },
+                                { pass: 'Pass 3', name: 'Semantic Analysis', desc: 'Context-aware fixes, field name typo correction, list structure fixes.' },
+                                { pass: 'Pass 4', name: 'Type Coercion', desc: 'Word-to-number conversion, boolean string normalization, type validation.' },
+                                { pass: 'Pass 5', name: 'Final Validation', desc: 'Parse check, calculate overall confidence, generate statistics.' },
+                            ].map((pass) => (
+                                <Grid item xs={12} key={pass.pass}>
+                                    <Paper elevation={0} sx={{
+                                        p: 2,
+                                        borderRadius: '12px',
+                                        bgcolor: isDarkMode ? 'rgba(255,255,255,0.03)' : '#f5f5f5',
+                                        borderLeft: `4px solid ${theme.palette.primary.main}`
+                                    }}>
+                                        <Typography variant="subtitle2" fontWeight={700} color="primary">{pass.pass}: {pass.name}</Typography>
+                                        <Typography variant="body2" color="text.secondary">{pass.desc}</Typography>
+                                    </Paper>
+                                </Grid>
                             ))}
-                        </div>
-                    </section>
+                        </Grid>
+                    </SectionWrapper>
 
-                    {/* YAML FIXER ENGINE */}
-                    <section id="yaml-fixer" className="scroll-mt-10 space-y-6">
-                        <div className="flex items-center gap-3">
-                            <BuildIcon className="text-[var(--color-blue)]" />
-                            <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">YAML Fixer Engine</h2>
-                        </div>
-                        <p className="text-[var(--color-text-secondary)]">3-phase architecture. Phase 1 always runs (even on broken YAML).</p>
-                        <div className="space-y-4">
-                            <div className="p-5 bg-[var(--color-bg-card)] border-l-4 border-[var(--color-blue)] rounded-r-xl">
-                                <h4 className="font-bold text-[var(--color-text-primary)] mb-2">Phase 1: Syntax Normalization</h4>
-                                <ul className="text-sm text-[var(--color-text-secondary)] space-y-1">
-                                    <li>• Typo correction: metdata → metadata</li>
-                                    <li>• Missing colons: apiVersion apps/v1 → apiVersion: apps/v1</li>
-                                    <li>• Indentation: tabs to spaces, alignment</li>
-                                    <li>• Quote balancing: fixes unclosed quotes</li>
-                                </ul>
-                            </div>
-                            <div className="p-5 bg-[var(--color-bg-card)] border-l-4 border-[var(--color-green)] rounded-r-xl">
-                                <h4 className="font-bold text-[var(--color-text-primary)] mb-2">Phase 2: Parse Validation</h4>
-                                <p className="text-sm text-[var(--color-text-secondary)]">Attempts js-yaml parsing. Reports errors with line numbers if failed.</p>
-                            </div>
-                            <div className="p-5 bg-[var(--color-bg-card)] border-l-4 border-[var(--color-purple)] rounded-r-xl">
-                                <h4 className="font-bold text-[var(--color-text-primary)] mb-2">Phase 3: Semantic Fixes</h4>
-                                <ul className="text-sm text-[var(--color-text-secondary)] space-y-1">
-                                    <li>• Field relocation: moves name/namespace under metadata</li>
-                                    <li>• Template injection: adds missing spec.template</li>
-                                    <li>• Container wrapping: wraps orphaned container specs</li>
-                                </ul>
-                            </div>
-                        </div>
-                        <h4 className="font-bold text-[var(--color-text-primary)]">Known Typo Corrections</h4>
-                        <div className="grid grid-cols-3 gap-2 text-sm">
-                            {[
-                                ['metdata', 'metadata'], ['namespce', 'namespace'], ['conatiners', 'containers'],
-                                ['containre', 'container'], ['volumne', 'volume'], ['lables', 'labels'],
-                                ['annotatons', 'annotations'], ['replicsa', 'replicas'], ['sepc', 'spec'],
-                            ].map(([typo, correct]) => (
-                                <div key={typo} className="flex items-center gap-2 px-3 py-2 bg-[var(--color-bg-tertiary)] rounded-lg">
-                                    <code className="text-[var(--color-red)]">{typo}</code>
-                                    <span className="text-[var(--color-text-tertiary)]">→</span>
-                                    <code className="text-[var(--color-green)]">{correct}</code>
-                                </div>
-                            ))}
-                        </div>
-                    </section>
+                    {/* TYPE REGISTRY */}
+                    <SectionWrapper id="type-registry">
+                        <Typography variant="h4" sx={headingStyle}>
+                            <KnowledgeIcon sx={{ color: '#1A73E8' }} /> Comprehensive Type Registry
+                        </Typography>
+                        <Typography sx={paragraphStyle}>
+                            Located in <code>type-registry.ts</code>. Defines 100+ K8s fields with strict type constraints.
+                        </Typography>
 
-                    {/* SEMANTIC ENGINE */}
-                    <section id="semantic-engine" className="scroll-mt-10 space-y-6">
-                        <div className="flex items-center gap-3">
-                            <PsychologyIcon className="text-[var(--color-blue)]" />
-                            <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">Semantic Engine</h2>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            {[
-                                { title: 'SemanticParser', file: 'semantic-parser.ts', desc: 'Builds semantic line representation with parent-child relationships.' },
-                                { title: 'ContextAnalyzer', file: 'context-analyzer.ts', desc: 'Tracks current path, detects block scalars, identifies line types.' },
-                                { title: 'IndentationTracker', file: 'indentation-tracker.ts', desc: 'Maintains indent stack for proper nesting.' },
-                                { title: 'IntelligentFixer', file: 'intelligent-fixer.ts', desc: 'Orchestrates fixers, runs up to 3 iterations.' },
-                            ].map((item) => (
-                                <div key={item.title} className="p-4 bg-[var(--color-bg-card)] border border-[var(--color-border)]/50 rounded-xl">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <h4 className="font-bold text-[var(--color-text-primary)]">{item.title}</h4>
-                                        <code className="text-[10px] px-1.5 py-0.5 bg-[var(--color-bg-tertiary)] text-[var(--color-text-tertiary)] rounded">{item.file}</code>
-                                    </div>
-                                    <p className="text-sm text-[var(--color-text-secondary)]">{item.desc}</p>
-                                </div>
-                            ))}
-                        </div>
-                        <h4 className="font-bold text-[var(--color-text-primary)]">Fixer Components</h4>
-                        <div className="space-y-3">
-                            {[
-                                { name: 'ContextAwareKeyFixer', desc: 'Detects missing colons using field knowledge and sibling patterns.' },
-                                { name: 'FieldNormalizer', desc: 'Fuzzy matches typos against 150+ known fields (Levenshtein distance ≤ 2).' },
-                                { name: 'ListStructureFixer', desc: 'Fixes broken list items: "- nginx" → "- name: nginx"' },
-                                { name: 'TypeCoercer', desc: 'Converts values: "yes"→"true", "three"→"3" for numeric fields.' },
-                            ].map((item) => (
-                                <div key={item.name} className="p-4 bg-[var(--color-bg-tertiary)] rounded-xl">
-                                    <code className="text-sm font-semibold text-[var(--color-blue)]">{item.name}</code>
-                                    <p className="text-sm text-[var(--color-text-secondary)] mt-1">{item.desc}</p>
-                                </div>
-                            ))}
-                        </div>
-                    </section>
+                        <Typography variant="h6" sx={subHeadingStyle}>Examples</Typography>
+                        <Box sx={codeBlockStyle}>
+                            {`// Numeric Fields
+replicas: integer, min: 0, default: 1
+port: integer, min: 1, max: 65535
+initialDelaySeconds: integer, min: 0, default: 0
 
-                    {/* KNOWLEDGE BASE */}
-                    <section id="knowledge-base" className="scroll-mt-10 space-y-6">
-                        <div className="flex items-center gap-3">
-                            <LibraryBooksIcon className="text-[var(--color-blue)]" />
-                            <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">Knowledge Base</h2>
-                        </div>
-                        <div className="p-5 bg-[var(--color-bg-card)] border border-[var(--color-border)]/50 rounded-xl">
-                            <h4 className="font-bold text-[var(--color-text-primary)] mb-3">Field Patterns (field-patterns.ts)</h4>
-                            <p className="text-sm text-[var(--color-text-tertiary)] mb-2">150+ known Kubernetes fields:</p>
-                            <div className="flex flex-wrap gap-1">
-                                {['apiVersion', 'kind', 'metadata', 'spec', 'containers', 'image', 'ports', 'env', 'resources', 'volumeMounts', 'livenessProbe'].map(f => (
-                                    <code key={f} className="px-1.5 py-0.5 bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] rounded text-xs">{f}</code>
-                                ))}
-                                <span className="text-[var(--color-text-tertiary)] text-xs">+140 more...</span>
-                            </div>
-                        </div>
-                        <div className="p-5 bg-[var(--color-bg-card)] border border-[var(--color-border)]/50 rounded-xl">
-                            <h4 className="font-bold text-[var(--color-text-primary)] mb-3">Type Registry (type-registry.ts)</h4>
-                            <div className="grid grid-cols-4 gap-3 text-xs">
-                                <div><p className="font-semibold text-[var(--color-text-primary)] mb-1">Boolean</p><p className="text-[var(--color-text-tertiary)]">hostNetwork, readOnly, privileged, tty</p></div>
-                                <div><p className="font-semibold text-[var(--color-text-primary)] mb-1">Number</p><p className="text-[var(--color-text-tertiary)]">replicas, port, containerPort</p></div>
-                                <div><p className="font-semibold text-[var(--color-text-primary)] mb-1">String</p><p className="text-[var(--color-text-tertiary)]">name, image, namespace</p></div>
-                                <div><p className="font-semibold text-[var(--color-text-primary)] mb-1">Object/Array</p><p className="text-[var(--color-text-tertiary)]">metadata, spec, containers</p></div>
-                            </div>
-                        </div>
-                    </section>
+// Boolean Fields
+privileged: default false
+hostNetwork: default false
+allowPrivilegeEscalation: default true
 
-                    {/* CONFIDENCE SYSTEM */}
-                    <section id="confidence-system" className="scroll-mt-10 space-y-6">
-                        <div className="flex items-center gap-3">
-                            <AnalyticsIcon className="text-[var(--color-blue)]" />
-                            <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">Confidence System</h2>
-                        </div>
-                        <p className="text-[var(--color-text-secondary)]">Every fix has a confidence score (0.0-1.0). Fixes below threshold are not applied.</p>
-                        <div className="grid grid-cols-3 gap-4">
-                            <div className="p-4 bg-[var(--color-bg-card)] border-l-4 border-[var(--color-green)] rounded-r-xl">
-                                <h4 className="font-bold text-[var(--color-text-primary)] mb-2">High (0.85-1.0)</h4>
-                                <ul className="text-sm text-[var(--color-text-secondary)] space-y-1">
-                                    <li>• Known field missing colon</li>
-                                    <li>• Known alias correction</li>
-                                    <li>• Typo with distance 1</li>
-                                </ul>
-                            </div>
-                            <div className="p-4 bg-[var(--color-bg-card)] border-l-4 border-[var(--color-orange)] rounded-r-xl">
-                                <h4 className="font-bold text-[var(--color-text-primary)] mb-2">Medium (0.7-0.85)</h4>
-                                <ul className="text-sm text-[var(--color-text-secondary)] space-y-1">
-                                    <li>• Pattern match with children</li>
-                                    <li>• Strong sibling pattern</li>
-                                </ul>
-                            </div>
-                            <div className="p-4 bg-[var(--color-bg-card)] border-l-4 border-[var(--color-text-tertiary)] rounded-r-xl">
-                                <h4 className="font-bold text-[var(--color-text-primary)] mb-2">Low (0.5-0.7)</h4>
-                                <ul className="text-sm text-[var(--color-text-secondary)] space-y-1">
-                                    <li>• Pattern match alone</li>
-                                    <li>• List restructure</li>
-                                </ul>
-                            </div>
-                        </div>
-                        <p className="text-sm text-[var(--color-text-tertiary)]"><strong>Default:</strong> 0.8 | <strong>Aggressive mode:</strong> 0.6</p>
-                    </section>
+// String Enums
+imagePullPolicy: ['Always', 'Never', 'IfNotPresent']
+restartPolicy: ['Always', 'OnFailure', 'Never']`}
+                        </Box>
+                    </SectionWrapper>
 
-                    {/* SUPPORTED RESOURCES */}
-                    <section id="supported-resources" className="scroll-mt-10 space-y-6">
-                        <div className="flex items-center gap-3">
-                            <CloudIcon className="text-[var(--color-blue)]" />
-                            <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">Supported Resources</h2>
-                        </div>
-                        <div className="grid grid-cols-4 gap-2">
-                            {['Pod', 'Deployment', 'StatefulSet', 'DaemonSet', 'ReplicaSet', 'Job', 'CronJob', 'Service', 'Ingress', 'NetworkPolicy', 'ConfigMap', 'Secret', 'PersistentVolumeClaim', 'PersistentVolume', 'StorageClass', 'ServiceAccount', 'Role', 'RoleBinding', 'ClusterRole', 'ClusterRoleBinding', 'Namespace', 'ResourceQuota', 'LimitRange', 'HorizontalPodAutoscaler'].map((r) => (
-                                <div key={r} className="px-3 py-2 bg-[var(--color-bg-card)] border border-[var(--color-border)]/50 rounded-lg text-sm text-[var(--color-text-secondary)] text-center">{r}</div>
-                            ))}
-                        </div>
-                    </section>
+                    {/* CLI TOOL */}
+                    <SectionWrapper id="cli-tool">
+                        <Typography variant="h4" sx={headingStyle}>
+                            <CliIcon sx={{ color: '#1A73E8' }} /> CLI Tool
+                        </Typography>
+                        <Typography sx={paragraphStyle}>
+                            Podscribe includes a robust CLI for CI/CD pipelines.
+                        </Typography>
 
-                    {/* BEST PRACTICES */}
-                    <section id="best-practices" className="scroll-mt-10 space-y-6">
-                        <div className="flex items-center gap-3">
-                            <VerifiedIcon className="text-[var(--color-blue)]" />
-                            <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">Best Practices</h2>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            {[
-                                { icon: <ScaleIcon />, title: 'Resource Management', items: ['CPU/memory limits defined', 'Requests specified', 'Requests ≤ Limits'] },
-                                { icon: <HealthAndSafetyIcon />, title: 'Health Checks', items: ['Liveness probes', 'Readiness probes', 'Startup probes'] },
-                                { icon: <StorageIcon />, title: 'High Availability', items: ['Replicas ≥ 2 in prod', 'Pod disruption budgets', 'Anti-affinity rules'] },
-                                { icon: <LockIcon />, title: 'Security', items: ['No privileged containers', 'No host network', 'Avoid latest tag'] },
-                            ].map((cat) => (
-                                <div key={cat.title} className="p-4 bg-[var(--color-bg-card)] border border-[var(--color-border)]/50 rounded-xl flex gap-3">
-                                    <div className="text-[var(--color-blue)]">{cat.icon}</div>
-                                    <div>
-                                        <h4 className="font-bold text-[var(--color-text-primary)] mb-1">{cat.title}</h4>
-                                        <ul className="text-sm text-[var(--color-text-secondary)] space-y-0.5">
-                                            {cat.items.map((i) => <li key={i}>• {i}</li>)}
-                                        </ul>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </section>
+                        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Scan Command</Typography>
+                        <Box sx={codeBlockStyle}>
+                            {`k8s-lint scan <path> [options]
 
-                    {/* ERROR REFERENCE */}
-                    <section id="error-reference" className="scroll-mt-10 space-y-6">
-                        <div className="flex items-center gap-3">
-                            <WarningIcon className="text-[var(--color-blue)]" />
-                            <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">Error Reference</h2>
-                        </div>
-                        <div className="space-y-4">
-                            <div className="p-4 border-l-4 border-[var(--color-red)] bg-[var(--color-bg-card)] rounded-r-xl">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <ErrorIcon className="text-[var(--color-red)]" style={{ fontSize: 18 }} />
-                                    <h4 className="font-bold text-[var(--color-text-primary)]">Schema Errors (Critical)</h4>
-                                </div>
-                                <ul className="text-sm text-[var(--color-text-secondary)] space-y-1">
-                                    <li>• Missing required fields (apiVersion, kind, metadata)</li>
-                                    <li>• Invalid field types</li>
-                                    <li>• Unknown fields or typos</li>
-                                </ul>
-                            </div>
-                            <div className="p-4 border-l-4 border-[var(--color-orange)] bg-[var(--color-bg-card)] rounded-r-xl">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <WarningIcon className="text-[var(--color-orange)]" style={{ fontSize: 18 }} />
-                                    <h4 className="font-bold text-[var(--color-text-primary)]">Warnings (Best Practice)</h4>
-                                </div>
-                                <ul className="text-sm text-[var(--color-text-secondary)] space-y-1">
-                                    <li>• Missing resource limits</li>
-                                    <li>• No health probes</li>
-                                    <li>• Using 'latest' tag</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </section>
+Options:
+  --k8s-version <version>    Kubernetes version to validate against
+  --policy-dir <dir>         Directory containing policy files
+  --output <format>          Output format (text/json/sarif)
+  --severity-threshold       Minimum severity (warning/error)`}
+                        </Box>
 
-                    {/* CLI USAGE */}
-                    <section id="cli-usage" className="scroll-mt-10 space-y-6">
-                        <div className="flex items-center gap-3">
-                            <TerminalIcon className="text-[var(--color-blue)]" />
-                            <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">CLI Usage</h2>
-                        </div>
-                        <div className="bg-[var(--color-bg-tertiary)] rounded-xl border border-[var(--color-border)]/50 overflow-hidden">
-                            <div className="px-4 py-2 bg-[var(--color-bg-secondary)] border-b border-[var(--color-border)]/30">
-                                <span className="text-xs font-semibold text-[var(--color-text-secondary)]">Commands</span>
-                            </div>
-                            <pre className="p-4 text-sm font-mono text-[var(--color-text-secondary)]">{`# Scan a single file
-podscribe scan deployment.yaml
+                        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Fix Command</Typography>
+                        <Box sx={codeBlockStyle}>
+                            {`k8s-lint yaml fix <path> [options]
 
-# Scan a directory
-podscribe scan ./manifests
-
-# Skip server validation
-podscribe scan . --skip-server-validation
-
-# Use custom policies
-podscribe scan . --policy-dir ./policies`}</pre>
-                        </div>
-                    </section>
-
-                    {/* API REFERENCE */}
-                    <section id="api-reference" className="scroll-mt-10 space-y-6">
-                        <div className="flex items-center gap-3">
-                            <ApiIcon className="text-[var(--color-blue)]" />
-                            <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">API Reference</h2>
-                        </div>
-                        <div className="border border-[var(--color-border)]/50 rounded-xl overflow-hidden">
-                            <div className="bg-[var(--color-bg-secondary)] px-4 py-2 border-b border-[var(--color-border)]/30 flex items-center gap-2">
-                                <span className="px-2 py-0.5 bg-[var(--color-green)] text-white text-xs font-bold rounded">POST</span>
-                                <code className="text-sm font-mono">/api/yaml/validate</code>
-                            </div>
-                            <div className="p-4 space-y-4">
-                                <div>
-                                    <h5 className="font-semibold text-sm mb-2">Request</h5>
-                                    <pre className="p-3 bg-[var(--color-bg-tertiary)] rounded-lg text-xs font-mono text-[var(--color-text-secondary)]">{`{ "content": "apiVersion: v1...", "options": { "aggressive": false } }`}</pre>
-                                </div>
-                                <div>
-                                    <h5 className="font-semibold text-sm mb-2">Response</h5>
-                                    <pre className="p-3 bg-[var(--color-bg-tertiary)] rounded-lg text-xs font-mono text-[var(--color-text-secondary)]">{`{ "success": true, "fixed": "...", "errors": [], "isValid": true }`}</pre>
-                                </div>
-                            </div>
-                        </div>
-                    </section>
+Options:
+  --aggressive               Apply aggressive structural fixes
+  --dry-run                  Preview changes without modifying
+  --diff                     Show detailed diff of changes`}
+                        </Box>
+                    </SectionWrapper>
 
                     {/* ARCHITECTURE */}
-                    <section id="architecture" className="scroll-mt-10 space-y-6">
-                        <div className="flex items-center gap-3">
-                            <AccountTreeIcon className="text-[var(--color-blue)]" />
-                            <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">Architecture</h2>
-                        </div>
-                        <div className="bg-[var(--color-bg-tertiary)] p-6 rounded-xl border border-[var(--color-border)]/50">
-                            <pre className="text-sm font-mono text-[var(--color-text-secondary)]">{`src/
-├── components/          # React UI
-├── core/                # yaml-validator, yaml-fixer
-├── semantic/            # SemanticParser, IntelligentFixer
-├── fixers/              # KeyFixer, FieldNormalizer, ListFixer
-├── knowledge/           # field-patterns, type-registry
-├── confidence/          # scorer.ts
-└── stages/              # stage0-8 validation pipeline`}</pre>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div><h4 className="font-bold mb-2">Frontend</h4><p className="text-sm text-[var(--color-text-secondary)]">React 19, TypeScript, Vite, Tailwind CSS, Monaco Editor</p></div>
-                            <div><h4 className="font-bold mb-2">Backend</h4><p className="text-sm text-[var(--color-text-secondary)]">Node.js, Express, tsx, js-yaml, Ajv</p></div>
-                        </div>
-                    </section>
+                    <SectionWrapper id="architecture">
+                        <Typography variant="h4" sx={headingStyle}>
+                            <ArchitectureIcon sx={{ color: '#1A73E8' }} /> Architecture
+                        </Typography>
+                        <Typography sx={paragraphStyle}>A dual-engine architecture combining rule-based validation with semantic analysis.</Typography>
 
-                    {/* FAQ */}
-                    <section id="faq" className="scroll-mt-10 space-y-6">
-                        <div className="flex items-center gap-3">
-                            <HelpIcon className="text-[var(--color-blue)]" />
-                            <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">FAQ</h2>
-                        </div>
-                        <div className="space-y-3">
+                        <Grid container spacing={2}>
+                            <Grid item xs={12} sm={6}>
+                                <Paper elevation={0} sx={cardStyle}>
+                                    <Typography variant="h6" gutterBottom>Frontend Stack</Typography>
+                                    <List dense>
+                                        <ListItemText primary="React 18" secondary="UI framework with hooks" />
+                                        <ListItemText primary="Monaco Editor" secondary="VS Code engine" />
+                                        <ListItemText primary="TypeScript 5.6" secondary="Type safety" />
+                                        <ListItemText primary="Vite" secondary="Build tool" />
+                                    </List>
+                                </Paper>
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <Paper elevation={0} sx={cardStyle}>
+                                    <Typography variant="h6" gutterBottom>Backend Stack</Typography>
+                                    <List dense>
+                                        <ListItemText primary="Express ^5.1.0" secondary="Web server" />
+                                        <ListItemText primary="js-yaml ^4.1.1" secondary="YAML parsing" />
+                                        <ListItemText primary="Parser/Fixer logic" secondary="Custom TS engines" />
+                                    </List>
+                                </Paper>
+                            </Grid>
+                        </Grid>
+                    </SectionWrapper>
+
+                    {/* API REFERENCE */}
+                    <SectionWrapper id="api-reference">
+                        <Typography variant="h4" sx={headingStyle}>
+                            <ApiIcon sx={{ color: '#1A73E8' }} /> API Endpoints
+                        </Typography>
+
+                        <Paper elevation={0} sx={{ ...cardStyle, mb: 3 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                                <Chip label="POST" color="primary" size="small" />
+                                <Typography fontWeight={700}>/api/validate</Typography>
+                            </Box>
+                            <Typography variant="body2" sx={{ mb: 2 }}>Rule-Based Validator for security and best practices.</Typography>
+                            <Box sx={codeBlockStyle}>
+                                {`// Request
+{
+  "yaml": "apiVersion: v1..."
+}
+
+// Response
+{
+  "valid": false,
+  "errors": [{...}],
+  "warnings": [{...}]
+}`}
+                            </Box>
+                        </Paper>
+
+                        <Paper elevation={0} sx={cardStyle}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                                <Chip label="POST" color="secondary" size="small" />
+                                <Typography fontWeight={700}>/api/yaml/validate</Typography>
+                            </Box>
+                            <Typography variant="body2" sx={{ mb: 2 }}>Intelligent Auto-Fixer with semantic repair.</Typography>
+                            <Box sx={codeBlockStyle}>
+                                {`// Request
+{
+  "content": "apiVersion: v1...",
+  "options": { "autoFix": true }
+}
+
+// Response
+{
+  "success": true,
+  "fixed": "...",
+  "changes": [{ "type": "syntax", "message": "..." }],
+  "isValid": true
+}`}
+                            </Box>
+                        </Paper>
+                    </SectionWrapper>
+
+                    {/* USAGE GUIDE */}
+                    <SectionWrapper id="usage">
+                        <Typography variant="h4" sx={headingStyle}>
+                            <InterfaceIcon sx={{ color: '#1A73E8' }} /> Usage Guide
+                        </Typography>
+                        <List>
+                            <ListItemButton><ListItemText primary="1. Enter YAML" secondary="Paste broken YAML in the left editor panel." /></ListItemButton>
+                            <ListItemButton><ListItemText primary="2. Enable Auto-Fix" secondary="Toggle the switch in the header (enabled by default)." /></ListItemButton>
+                            <ListItemButton><ListItemText primary="3. Validate" secondary="Click 'Validate' or wait for auto-debounce." /></ListItemButton>
+                            <ListItemButton><ListItemText primary="4. Console" secondary="Review fixes and errors in the side console." /></ListItemButton>
+                        </List>
+                    </SectionWrapper>
+
+                    {/* CONFIGURATION */}
+                    <SectionWrapper id="configuration">
+                        <Typography variant="h4" sx={headingStyle}>
+                            <ConfigIcon sx={{ color: '#1A73E8' }} /> Configuration
+                        </Typography>
+                        <Box sx={codeBlockStyle}>
+                            {`// intelligent-fixer.ts options
+{
+  confidenceThreshold: 0.7, // Default. Aggressive: 0.6
+  aggressive: false,        // True for more risky fixes
+  maxIterations: 3,         // Self-correction loops
+  indentSize: 2,            // 2 or 4 spaces
+  autoFix: true
+}`}
+                        </Box>
+                    </SectionWrapper>
+
+                    {/* EXAMPLES */}
+                    <SectionWrapper id="examples">
+                        <Typography variant="h4" sx={headingStyle}>
+                            <ExamplesIcon sx={{ color: '#1A73E8' }} /> Real-World Examples
+                        </Typography>
+
+                        <Typography variant="h6" sx={subHeadingStyle}>1. Typo Correction</Typography>
+                        <Grid container spacing={2}>
+                            <Grid item xs={6}>
+                                <Typography variant="caption" display="block" color="error">Input</Typography>
+                                <Box sx={codeBlockStyle}>
+                                    {`metdata:
+  name test
+sepc:
+  contaienrs:
+    - name nginx`}
+                                </Box>
+                            </Grid>
+                            <Grid item xs={6}>
+                                <Typography variant="caption" display="block" color="success">Fixed Output</Typography>
+                                <Box sx={codeBlockStyle}>
+                                    {`metadata:
+  name: test
+spec:
+  containers:
+    - name: nginx`}
+                                </Box>
+                            </Grid>
+                        </Grid>
+
+                        <Typography variant="h6" sx={subHeadingStyle}>2. Type Coercion</Typography>
+                        <Box sx={codeBlockStyle}>
+                            {`// Input
+replicas three
+port eighty
+hostNetwork yes
+
+// Fixed
+replicas: 3
+port: 80
+hostNetwork: true`}
+                        </Box>
+                    </SectionWrapper>
+
+                    {/* PERFORMANCE */}
+                    <SectionWrapper id="performance">
+                        <Typography variant="h4" sx={headingStyle}>
+                            <SpeedIcon sx={{ color: '#1A73E8' }} /> Performance
+                        </Typography>
+                        <Grid container spacing={2}>
                             {[
-                                { q: 'What K8s versions are supported?', a: 'Validates against K8s API v1.29, compatible with v1.16+.' },
-                                { q: 'Can I validate multiple documents?', a: 'Yes, separate with --- and each is validated independently.' },
-                                { q: 'What is the confidence threshold?', a: 'Default 0.8. Aggressive mode uses 0.6.' },
-                                { q: 'Can I add custom policies?', a: 'Yes, use --policy-dir with Kyverno-style ClusterPolicy YAML files.' },
-                            ].map((faq, idx) => (
-                                <div key={idx} className="p-4 bg-[var(--color-bg-card)] border border-[var(--color-border)]/50 rounded-xl">
-                                    <h4 className="font-bold text-[var(--color-text-primary)] mb-1">{faq.q}</h4>
-                                    <p className="text-sm text-[var(--color-text-secondary)]">{faq.a}</p>
-                                </div>
+                                { label: 'Validation Speed', val: '< 100ms' },
+                                { label: 'Fix Accuracy', val: '90%+' },
+                                { label: 'Bundle Size', val: '~500KB' },
+                                { label: 'First Load', val: '< 2s' },
+                            ].map((stat, idx) => (
+                                <Grid item xs={3} key={idx}>
+                                    <Paper sx={{ textAlign: 'center', p: 2, bgcolor: isDarkMode ? '#1E1E1E' : '#FFF' }}>
+                                        <Typography variant="h5" color="primary" fontWeight={700}>{stat.val}</Typography>
+                                        <Typography variant="caption" color="text.secondary">{stat.label}</Typography>
+                                    </Paper>
+                                </Grid>
                             ))}
-                        </div>
-                    </section>
+                        </Grid>
+                    </SectionWrapper>
 
-                    <footer className="text-center py-10 border-t border-[var(--color-border)]/30 text-[var(--color-text-tertiary)] text-sm">
-                        <p>Podscribe v2.0 • Kubernetes YAML Linter</p>
-                    </footer>
-                </div>
-            </div>
-        </div>
+                </Box>
+
+                {/* Footer */}
+                <Box sx={{ py: 6, textAlign: 'center', borderTop: `1px solid ${isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`, mt: 10 }}>
+                    <Typography variant="body2" color="text.secondary">Podscribe v1.0.0 • Built with ❤️ for the Kubernetes community</Typography>
+                </Box>
+            </Box>
+        </Box>
     );
 };

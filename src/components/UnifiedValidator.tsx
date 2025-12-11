@@ -1,4 +1,36 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import {
+    Typography,
+    IconButton,
+    Button,
+    Switch,
+    Drawer,
+    Chip,
+    Badge,
+    Snackbar,
+    Alert,
+    Box,
+    useTheme,
+    useMediaQuery,
+    CircularProgress,
+    Tooltip,
+} from '@mui/material';
+import {
+    Brightness4 as DarkModeIcon,
+    Brightness7 as LightModeIcon,
+    MenuBook as DocumentationIcon,
+    Terminal as ConsoleIcon,
+    PlayArrow as ValidateIcon,
+    ContentCopy as CopyIcon,
+    Download as DownloadIcon,
+    Clear as ClearIcon,
+    Close as CloseIcon,
+    CheckCircle as CheckIcon,
+    CompareArrows as DiffIcon,
+    UploadFile as UploadIcon,
+    Policy as RegoIcon,
+    ErrorOutline as ErrorIcon,
+} from '@mui/icons-material';
 import { Documentation } from './Documentation';
 import { StatisticsPanel } from './StatisticsPanel';
 import { CodeEditor } from './CodeEditor';
@@ -30,6 +62,9 @@ interface ToastNotification {
 }
 
 export const UnifiedValidator: React.FC = () => {
+    const theme = useTheme();
+    useMediaQuery(theme.breakpoints.down('md')); // Pre-compute for responsive use
+
     // State
     const [inputYaml, setInputYaml] = useState('');
     const [outputYaml, setOutputYaml] = useState('');
@@ -42,17 +77,19 @@ export const UnifiedValidator: React.FC = () => {
 
     const [isValid, setIsValid] = useState(false);
     const [fixEnabled, setFixEnabled] = useState(true);
-    const [theme, setTheme] = useState<'light' | 'dark'>('dark');
+    const [darkMode, setDarkMode] = useState(true);
     const [showDocumentation, setShowDocumentation] = useState(false);
     const [showConsole, setShowConsole] = useState(false);
     const [consoleTab, setConsoleTab] = useState<'fixes' | 'errors'>('fixes');
     const [toasts, setToasts] = useState<ToastNotification[]>([]);
-    const [showConfetti, setShowConfetti] = useState(false);
-
 
     // New Feature States
     const [showDiff, setShowDiff] = useState(false);
-    const [confidenceFilter, setConfidenceFilter] = useState<'all' | 'high' | 'medium' | 'low'>('all');
+    const [confidenceFilter] = useState<'all' | 'high' | 'medium' | 'low'>('all');
+
+    // File input refs
+    const yamlFileInputRef = useRef<HTMLInputElement>(null);
+    const regoFileInputRef = useRef<HTMLInputElement>(null);
 
     // Refs
     const toastIdRef = useRef(0);
@@ -66,7 +103,35 @@ export const UnifiedValidator: React.FC = () => {
         }, 3000);
     }, []);
 
+    // File upload handlers
+    const handleYamlUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const content = e.target?.result as string;
+                setInputYaml(content);
+                addToast(`Loaded ${file.name}`, 'success');
+            };
+            reader.readAsText(file);
+        }
+        // Reset input
+        if (yamlFileInputRef.current) {
+            yamlFileInputRef.current.value = '';
+        }
+    };
 
+    const handleRegoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            addToast(`Rego policy ${file.name} added`, 'info');
+            // TODO: Handle Rego file logic
+        }
+        // Reset input
+        if (regoFileInputRef.current) {
+            regoFileInputRef.current.value = '';
+        }
+    };
 
     // Validation handler
     const handleValidate = useCallback(async () => {
@@ -94,11 +159,10 @@ export const UnifiedValidator: React.FC = () => {
             const endTime = performance.now();
             setProcessingTime(Math.round(endTime - startTime));
 
-            // Only set fixed output if fix is enabled
             if (fixEnabled) {
                 setOutputYaml(data.fixed);
             } else {
-                setOutputYaml(''); // Clear output if fix is disabled
+                setOutputYaml('');
             }
 
             setErrors(data.errors || []);
@@ -107,10 +171,8 @@ export const UnifiedValidator: React.FC = () => {
             setSummary(data.summary);
             setOverallConfidence(data.confidence || 0);
 
-            // Open console to show results
             setShowConsole(true);
 
-            // Set appropriate tab
             if (fixEnabled && data.fixedCount > 0) {
                 setConsoleTab('fixes');
             } else if (data.errors.length > 0) {
@@ -119,8 +181,6 @@ export const UnifiedValidator: React.FC = () => {
 
             if (data.isValid && data.fixedCount === 0) {
                 addToast('YAML is perfect! No issues found.', 'success');
-                setShowConfetti(true);
-                setTimeout(() => setShowConfetti(false), 2000);
             } else if (fixEnabled && data.isValid && data.fixedCount > 0) {
                 addToast(`Fixed ${data.fixedCount} issue${data.fixedCount > 1 ? 's' : ''}`, 'success');
             } else if (!fixEnabled && data.errors.length > 0) {
@@ -156,11 +216,6 @@ export const UnifiedValidator: React.FC = () => {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [handleValidate]);
 
-    // Theme effect
-    useEffect(() => {
-        document.documentElement.setAttribute('data-theme', theme);
-    }, [theme]);
-
     // Utility functions
     const handleCopy = () => {
         if (outputYaml) {
@@ -187,7 +242,6 @@ export const UnifiedValidator: React.FC = () => {
         setOutputYaml('');
         setErrors([]);
         setChanges([]);
-
         setShowConsole(false);
     };
 
@@ -199,9 +253,8 @@ export const UnifiedValidator: React.FC = () => {
         return acc;
     }, {} as Record<string, ValidationError[]>), [errors]);
 
-    // Group changes by category (Adaptive Grouping)
+    // Group changes by category
     const groupedChanges = useMemo(() => {
-        // Filter by confidence first
         const filtered = changes.filter(change => {
             if (confidenceFilter === 'all') return true;
             if (confidenceFilter === 'high') return change.confidence >= 0.9;
@@ -210,11 +263,8 @@ export const UnifiedValidator: React.FC = () => {
             return true;
         });
 
-        // Group by inferred category
         return filtered.reduce((acc, change) => {
-            let category = 'Semantic'; // Default
-
-            // Infer category from type
+            let category = 'Semantic';
             const type = change.type.toLowerCase();
             if (type.includes('syntax') || type.includes('colon') || type.includes('quote') || type.includes('indent')) {
                 category = 'Syntax';
@@ -230,16 +280,14 @@ export const UnifiedValidator: React.FC = () => {
         }, {} as Record<string, FixChange[]>);
     }, [changes, confidenceFilter]);
 
-    // Calculate stats if summary is missing
+    // Calculate stats
     const stats = useMemo(() => {
         if (summary) return summary;
-
-        // Fallback calculation
         return {
             totalIssues: errors.length + changes.length,
             fixedCount: changes.length,
             parsingSuccess: true,
-            bySeverity: { critical: 0, error: 0, warning: 0, info: 0 }, // Placeholder
+            bySeverity: { critical: 0, error: 0, warning: 0, info: 0 },
             byCategory: { syntax: 0, structure: 0, semantic: 0, type: 0 },
             byConfidence: { high: 0, medium: 0, low: 0 },
             remainingIssues: errors.length,
@@ -248,513 +296,1175 @@ export const UnifiedValidator: React.FC = () => {
         };
     }, [summary, errors, changes, overallConfidence, processingTime]);
 
+    // Colors are defined inline where needed
+
     return (
-        <div className="h-screen flex flex-col bg-gradient-to-br from-[var(--color-bg-primary)] to-[var(--color-bg-secondary)] overflow-hidden font-sans animate-fade-in-soft" data-theme={theme}>
-            {/* Header Bar - Clean & Borderless */}
-            <header className="h-14 flex-shrink-0 flex items-center justify-between px-5 bg-[var(--color-bg-primary)]/80 backdrop-blur-xl z-30 animate-slide-down">
-                {/* Left: Brand (logo + name) - refined and centered vertically */}
-                <div className="flex items-center gap-0">
-                    <div className="leading-tight">
-                        <h1 className="text-lg md:text-xl font-extrabold tracking-tight text-[var(--color-text-primary)]">Podscribe</h1>
-                        <div className="text-[11px] text-[var(--color-text-tertiary)] -mt-0.5">Kubernetes YAML Linter</div>
-                    </div>
-                </div>
+        <Box
+            sx={{
+                height: '100vh',
+                display: 'flex',
+                flexDirection: 'column',
+                bgcolor: darkMode ? '#0f0f0f' : '#FAFAFA',
+                overflow: 'hidden',
+            }}
+        >
+            {/* Hidden file inputs */}
+            <input
+                type="file"
+                ref={yamlFileInputRef}
+                onChange={handleYamlUpload}
+                accept=".yaml,.yml"
+                style={{ display: 'none' }}
+            />
+            <input
+                type="file"
+                ref={regoFileInputRef}
+                onChange={handleRegoUpload}
+                accept=".rego"
+                style={{ display: 'none' }}
+            />
 
-                {/* Right: Actions */}
-                <div className="flex items-center gap-1.5">
-                    {/* Console Toggle */}
-                    <button
-                        onClick={() => setShowConsole(!showConsole)}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 btn-press ${showConsole
-                            ? 'bg-[var(--color-blue)] text-white shadow-sm'
-                            : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-secondary)]/60'
-                            }`}
-                        title="Toggle Console"
-                    >
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        <span>Console</span>
-                        {(changes.length > 0 || errors.length > 0) && (
-                            <span className="flex items-center justify-center min-w-[18px] h-4 px-1 rounded-full bg-white/25 text-[10px] font-bold">
-                                {changes.length + errors.length}
-                            </span>
-                        )}
-                    </button>
-
-                    {/* Documentation */}
-                    <button
-                        onClick={() => setShowDocumentation(true)}
-                        className="p-2 rounded-lg text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-secondary)]/60 transition-all btn-press btn-hover"
-                        title="Documentation"
-                    >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                        </svg>
-                    </button>
-
-                    {/* Theme Toggle */}
-                    <button
-                        onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-                        className="p-2 rounded-lg text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-secondary)]/60 transition-all btn-press btn-hover"
-                        title="Toggle Theme"
-                    >
-                        {theme === 'light' ? (
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                            </svg>
-                        ) : (
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                            </svg>
-                        )}
-                    </button>
-                </div>
-            </header>
-
-            {/* Main Workspace Area */}
-            <div className="flex-1 flex overflow-hidden bg-[var(--color-bg-secondary)]">
-                {/* Editor Area */}
-                <main className="flex-1 flex flex-col min-w-0 transition-all duration-300">
-                    <div className="flex-1 flex flex-col md:flex-row h-full">
-                        {/* Input Panel */}
-                        <div className="flex-1 flex flex-col bg-[var(--color-bg-primary)]">
-                            {/* Panel Header - Borderless */}
-                            <div className="h-11 flex items-center justify-between px-4 bg-[var(--color-bg-secondary)]/40">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--color-blue)]"></div>
-                                    <span className="text-xs font-bold text-[var(--color-text-primary)]">Input YAML</span>
-                                </div>
-                                {inputYaml && (
-                                    <button
-                                        onClick={handleClear}
-                                        className="text-[11px] font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-red)] transition-colors px-2 py-1 rounded-full hover:bg-[var(--color-bg-primary)]/80 btn-press"
-                                    >
-                                        Clear
-                                    </button>
-                                )}
-                            </div>
-                            {/* Editor */}
-                            <div className="flex-1 relative">
-                                <CodeEditor
-                                    value={inputYaml}
-                                    onChange={(value) => setInputYaml(value || '')}
-                                    theme={theme}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Output Panel */}
-                        <div className="flex-1 flex flex-col bg-[var(--color-bg-primary)]">
-                            {/* Panel Header - Borderless & Elegant */}
-                            <div className="h-11 flex items-center justify-between px-4 bg-[var(--color-bg-secondary)]/40">
-                                <div className="flex items-center gap-2">
-                                    <div className={`w-1.5 h-1.5 rounded-full ${outputYaml ? (isValid ? 'bg-[var(--color-green)]' : 'bg-[var(--color-orange)]') : 'bg-[var(--color-text-tertiary)]/50'}`}></div>
-                                    <span className="text-xs font-bold text-[var(--color-text-primary)]">
-                                        {fixEnabled ? 'Fixed Output' : 'Validation'}
-                                    </span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    {/* Auto-Fix Toggle - Borderless Pill */}
-                                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--color-bg-primary)]/80">
-                                        <span className="text-[10px] font-semibold text-[var(--color-text-secondary)]">Auto-Fix</span>
-                                        <div
-                                            className={`relative w-8 h-[18px] rounded-full transition-all cursor-pointer btn-press ${fixEnabled ? 'bg-[var(--color-green)]' : 'bg-[var(--color-text-tertiary)]/30'}`}
-                                            onClick={() => setFixEnabled(!fixEnabled)}
-                                        >
-                                            <div className={`absolute top-[3px] left-[3px] w-3 h-3 bg-white rounded-full shadow-sm transition-transform duration-200 ${fixEnabled ? 'translate-x-[14px]' : 'translate-x-0'}`} />
-                                        </div>
-                                    </div>
-
-                                    {/* Validate Button - Clean Pill */}
-                                    <button
-                                        onClick={handleValidate}
-                                        disabled={isValidating || !inputYaml.trim()}
-                                        className="flex items-center gap-1.5 bg-[var(--color-blue)] hover:bg-[var(--color-blue-dark)] text-white px-3.5 py-1.5 rounded-full text-[11px] font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95 btn-hover"
-                                    >
-                                        {isValidating ? (
-                                            <>
-                                                <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                                <span>Validating</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                                                </svg>
-                                                <span>Validate</span>
-                                            </>
-                                        )}
-                                    </button>
-
-                                    {/* Diff Toggle */}
-                                    {outputYaml && (
-                                        <button
-                                            onClick={() => setShowDiff(!showDiff)}
-                                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold transition-all btn-press ${showDiff
-                                                ? 'bg-[var(--color-blue)] text-white'
-                                                : 'bg-[var(--color-bg-primary)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-                                                }`}
-                                            title="Toggle Diff View"
-                                        >
-                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                                            </svg>
-                                            {showDiff ? 'Hide Changes' : 'Show Changes'}
-                                        </button>
-                                    )}
-
-                                    {/* Actions - Borderless Icons */}
-                                    {outputYaml && (
-                                        <div className="flex items-center gap-0.5 ml-1">
-                                            <button
-                                                onClick={handleCopy}
-                                                className="p-1.5 text-[var(--color-text-secondary)] hover:text-[var(--color-blue)] hover:bg-[var(--color-bg-primary)]/80 rounded-full transition-colors btn-press btn-hover"
-                                                title="Copy to clipboard"
-                                            >
-                                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                                </svg>
-                                            </button>
-                                            <button
-                                                onClick={handleDownload}
-                                                className="p-1.5 text-[var(--color-text-secondary)] hover:text-[var(--color-blue)] hover:bg-[var(--color-bg-primary)]/80 rounded-full transition-colors btn-press btn-hover"
-                                                title="Download YAML"
-                                            >
-                                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                                </svg>
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                            {/* Editor */}
-                            <div className="flex-1 relative">
-                                {!outputYaml && (
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center text-[var(--color-text-tertiary)] z-10">
-                                        <svg className="w-16 h-16 mb-4 opacity-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                        </svg>
-                                        <p className="text-[13px] font-medium">Validation results will appear here</p>
-                                    </div>
-                                )}
-                                <CodeEditor
-                                    value={outputYaml}
-                                    theme={theme}
-                                    readOnly={true}
-                                    diffMode={showDiff}
-                                    originalValue={inputYaml}
-                                    modifiedValue={outputYaml}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                </main>
-
-                {/* Console Sidebar - Refined & Polished */}
-                {showConsole && (
-                    <aside className="fixed inset-0 z-50 md:static md:z-20 md:w-[360px] flex-shrink-0 bg-[var(--color-bg-primary)]/95 backdrop-blur-3xl flex flex-col animate-slide-in-right shadow-xl">
-                        {/* Console Header */}
-                        <div className="h-11 flex items-center justify-between px-3.5 bg-[var(--color-bg-secondary)]/30">
-                            <div className="flex items-center gap-2">
-                                <div className="w-6 h-6 rounded-md bg-gradient-to-br from-[var(--color-blue)] to-[var(--color-blue-dark)] flex items-center justify-center shadow-sm">
-                                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                    </svg>
-                                </div>
-                                <span className="text-xs font-bold text-[var(--color-text-primary)]">Console</span>
-                            </div>
-                            <button
-                                onClick={() => setShowConsole(false)}
-                                className="w-6 h-6 rounded-md flex items-center justify-center text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-secondary)]/50 transition-all btn-press btn-hover"
-                                title="Close"
+            {/* Header - Refined MD3 + Liquid Glassmorphism */}
+            <Box
+                component="header"
+                sx={{
+                    position: 'relative',
+                    zIndex: 100,
+                    // Enhanced glassmorphism
+                    background: darkMode
+                        ? 'linear-gradient(180deg, rgba(28, 28, 30, 0.92) 0%, rgba(20, 20, 22, 0.96) 100%)'
+                        : 'linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(250, 250, 252, 0.96) 100%)',
+                    backdropFilter: 'blur(24px) saturate(200%)',
+                    WebkitBackdropFilter: 'blur(24px) saturate(200%)',
+                    borderBottom: darkMode
+                        ? '1px solid rgba(255, 255, 255, 0.08)'
+                        : '1px solid rgba(0, 0, 0, 0.06)',
+                    boxShadow: darkMode
+                        ? '0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 4px 20px rgba(0, 0, 0, 0.25)'
+                        : '0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 4px 20px rgba(0, 0, 0, 0.04)',
+                }}
+            >
+                <Box
+                    sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        px: { xs: 2, sm: 2.5, md: 3 },
+                        py: 1.5,
+                        minHeight: 60,
+                        gap: { xs: 1.5, md: 3 },
+                    }}
+                >
+                    {/* Left Section - File Actions */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, md: 1.5 } }}>
+                        {/* Upload YAML */}
+                        <Tooltip title="Upload YAML File" arrow placement="bottom">
+                            <IconButton
+                                onClick={() => yamlFileInputRef.current?.click()}
+                                sx={{
+                                    width: 42,
+                                    height: 42,
+                                    borderRadius: '12px',
+                                    color: darkMode ? '#8AB4F8' : '#1A73E8',
+                                    bgcolor: darkMode ? 'rgba(138, 180, 248, 0.1)' : 'rgba(26, 115, 232, 0.08)',
+                                    transition: 'all 0.2s ease',
+                                    border: darkMode ? '1px solid rgba(138, 180, 248, 0.2)' : '1px solid rgba(26, 115, 232, 0.15)',
+                                    '&:hover': {
+                                        bgcolor: darkMode ? 'rgba(138, 180, 248, 0.18)' : 'rgba(26, 115, 232, 0.14)',
+                                        transform: 'translateY(-1px)',
+                                    },
+                                }}
                             >
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        </div>
+                                <UploadIcon sx={{ fontSize: 22 }} />
+                            </IconButton>
+                        </Tooltip>
 
-                        {/* Tabs - Segmented Control */}
-                        <div className="px-3 py-2">
-                            <div className="flex p-0.5 rounded-lg bg-[var(--color-bg-secondary)]/50">
-                                <button
-                                    onClick={() => setConsoleTab('fixes')}
-                                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-[11px] font-bold transition-all duration-150 btn-press ${consoleTab === 'fixes'
-                                        ? 'bg-[var(--color-bg-primary)] text-[var(--color-text-primary)] shadow-sm'
-                                        : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-                                        }`}
-                                >
-                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                    </svg>
-                                    Fixes
-                                    {changes.length > 0 && (
-                                        <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--color-green)] text-white text-[9px] font-bold flex items-center justify-center">
-                                            {changes.length}
-                                        </span>
-                                    )}
-                                </button>
-                                <button
-                                    onClick={() => setConsoleTab('errors')}
-                                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-[11px] font-bold transition-all duration-150 btn-press ${consoleTab === 'errors'
-                                        ? 'bg-[var(--color-bg-primary)] text-[var(--color-text-primary)] shadow-sm'
-                                        : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-                                        }`}
-                                >
-                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    Errors
-                                    {errors.length > 0 && (
-                                        <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--color-red)] text-white text-[9px] font-bold flex items-center justify-center">
-                                            {errors.length}
-                                        </span>
-                                    )}
-                                </button>
-                            </div>
-                        </div>
+                        {/* Add Rego Policy */}
+                        <Tooltip title="Add Rego Policy" arrow placement="bottom">
+                            <IconButton
+                                onClick={() => regoFileInputRef.current?.click()}
+                                sx={{
+                                    width: 42,
+                                    height: 42,
+                                    borderRadius: '12px',
+                                    color: darkMode ? '#C474FB' : '#9333EA',
+                                    bgcolor: darkMode ? 'rgba(196, 116, 251, 0.1)' : 'rgba(147, 51, 234, 0.08)',
+                                    transition: 'all 0.2s ease',
+                                    border: darkMode ? '1px solid rgba(196, 116, 251, 0.2)' : '1px solid rgba(147, 51, 234, 0.15)',
+                                    '&:hover': {
+                                        bgcolor: darkMode ? 'rgba(196, 116, 251, 0.18)' : 'rgba(147, 51, 234, 0.14)',
+                                        transform: 'translateY(-1px)',
+                                    },
+                                }}
+                            >
+                                <RegoIcon sx={{ fontSize: 22 }} />
+                            </IconButton>
+                        </Tooltip>
+                    </Box>
 
-                        {/* Content */}
-                        <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-4">
-                            {/* Statistics Panel */}
-                            {(changes.length > 0 || errors.length > 0) && (
-                                <div className="animate-fade-in-soft">
-                                    <StatisticsPanel
-                                        totalIssues={stats.totalIssues}
-                                        fixedCount={stats.fixedCount}
-                                        processingTimeMs={stats.processingTimeMs}
-                                        confidence={stats.overallConfidence}
+                    {/* Center Section - Validate Button & Auto-Fix (Desktop) */}
+                    <Box
+                        sx={{
+                            display: { xs: 'none', md: 'flex' },
+                            alignItems: 'center',
+                            gap: 2,
+                            // Glassmorphic container
+                            background: darkMode
+                                ? 'rgba(255, 255, 255, 0.04)'
+                                : 'rgba(0, 0, 0, 0.02)',
+                            borderRadius: '16px',
+                            padding: '6px 8px 6px 6px',
+                            border: darkMode
+                                ? '1px solid rgba(255, 255, 255, 0.06)'
+                                : '1px solid rgba(0, 0, 0, 0.04)',
+                        }}
+                    >
+                        <Button
+                            variant="contained"
+                            startIcon={isValidating ? <CircularProgress size={16} color="inherit" /> : <ValidateIcon sx={{ fontSize: '18px !important' }} />}
+                            onClick={handleValidate}
+                            disabled={isValidating || !inputYaml.trim()}
+                            sx={{
+                                background: isValidating
+                                    ? (darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)')
+                                    : 'linear-gradient(145deg, #32D74B 0%, #30B84A 100%)',
+                                color: isValidating ? (darkMode ? '#888' : '#999') : '#FFFFFF',
+                                borderRadius: '12px',
+                                textTransform: 'none',
+                                fontSize: '14px',
+                                fontWeight: 600,
+                                px: 3,
+                                py: 1,
+                                minHeight: 40,
+                                letterSpacing: '-0.01em',
+                                boxShadow: isValidating ? 'none' : '0 2px 8px rgba(48, 209, 88, 0.3)',
+                                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                '&:hover': {
+                                    background: 'linear-gradient(145deg, #3AE254 0%, #32D74B 100%)',
+                                    boxShadow: '0 4px 14px rgba(48, 209, 88, 0.4)',
+                                },
+                                '&:disabled': {
+                                    background: darkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+                                    color: darkMode ? '#555' : '#AAA',
+                                    boxShadow: 'none',
+                                },
+                            }}
+                        >
+                            {isValidating ? 'Validating...' : 'Validate'}
+                        </Button>
+
+                        {/* Auto-Fix Toggle */}
+                        <Box
+                            sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 0.75,
+                            }}
+                        >
+                            <Typography
+                                sx={{
+                                    fontSize: '12px',
+                                    color: darkMode ? 'rgba(255, 255, 255, 0.55)' : 'rgba(0, 0, 0, 0.5)',
+                                    fontWeight: 500,
+                                    letterSpacing: '-0.01em',
+                                }}
+                            >
+                                Auto-Fix
+                            </Typography>
+                            <Switch
+                                checked={fixEnabled}
+                                onChange={(e) => setFixEnabled(e.target.checked)}
+                                size="small"
+                                sx={{
+                                    '& .MuiSwitch-switchBase.Mui-checked': {
+                                        color: '#32D74B',
+                                    },
+                                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                                        backgroundColor: '#32D74B',
+                                    },
+                                }}
+                            />
+                        </Box>
+                    </Box>
+
+                    {/* Right Section - Tools */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                        {/* Console */}
+                        <Tooltip title="Console" arrow placement="bottom">
+                            <Badge
+                                badgeContent={changes.length + errors.length}
+                                max={99}
+                                invisible={changes.length + errors.length === 0}
+                                sx={{
+                                    '& .MuiBadge-badge': {
+                                        fontSize: '10px',
+                                        minWidth: 18,
+                                        height: 18,
+                                        bgcolor: '#1A73E8',
+                                        color: '#FFF',
+                                        fontWeight: 600,
+                                        border: darkMode ? '2px solid #1c1c1e' : '2px solid #FFF',
+                                    },
+                                }}
+                            >
+                                <IconButton
+                                    onClick={() => setShowConsole(!showConsole)}
+                                    sx={{
+                                        width: 42,
+                                        height: 42,
+                                        borderRadius: '12px',
+                                        color: showConsole
+                                            ? (darkMode ? '#8AB4F8' : '#1A73E8')
+                                            : (darkMode ? 'rgba(255, 255, 255, 0.65)' : 'rgba(0, 0, 0, 0.55)'),
+                                        bgcolor: showConsole
+                                            ? (darkMode ? 'rgba(208, 188, 255, 0.15)' : 'rgba(103, 80, 164, 0.1)')
+                                            : 'transparent',
+                                        transition: 'all 0.15s ease',
+                                        '&:hover': {
+                                            bgcolor: darkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
+                                        },
+                                    }}
+                                >
+                                    <ConsoleIcon sx={{ fontSize: 22 }} />
+                                </IconButton>
+                            </Badge>
+                        </Tooltip>
+
+                        {/* Documentation */}
+                        <Tooltip title="Documentation" arrow placement="bottom">
+                            <IconButton
+                                onClick={() => setShowDocumentation(true)}
+                                sx={{
+                                    width: 42,
+                                    height: 42,
+                                    borderRadius: '12px',
+                                    color: darkMode ? 'rgba(255, 255, 255, 0.65)' : 'rgba(0, 0, 0, 0.55)',
+                                    transition: 'all 0.15s ease',
+                                    '&:hover': {
+                                        bgcolor: darkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
+                                    },
+                                }}
+                            >
+                                <DocumentationIcon sx={{ fontSize: 22 }} />
+                            </IconButton>
+                        </Tooltip>
+
+                        {/* Divider */}
+                        <Box
+                            sx={{
+                                width: 1,
+                                height: 28,
+                                bgcolor: darkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
+                                mx: 0.5,
+                                borderRadius: 1,
+                            }}
+                        />
+
+                        {/* Theme Toggle */}
+                        <Tooltip title={darkMode ? 'Light Mode' : 'Dark Mode'} arrow placement="bottom">
+                            <IconButton
+                                onClick={() => setDarkMode(!darkMode)}
+                                sx={{
+                                    width: 42,
+                                    height: 42,
+                                    borderRadius: '12px',
+                                    color: darkMode ? '#FFD60A' : '#FF9F0A',
+                                    bgcolor: darkMode ? 'rgba(255, 214, 10, 0.1)' : 'rgba(255, 159, 10, 0.08)',
+                                    transition: 'all 0.2s ease',
+                                    '&:hover': {
+                                        bgcolor: darkMode ? 'rgba(255, 214, 10, 0.18)' : 'rgba(255, 159, 10, 0.14)',
+                                        transform: 'rotate(15deg)',
+                                    },
+                                }}
+                            >
+                                {darkMode ? <LightModeIcon sx={{ fontSize: 22 }} /> : <DarkModeIcon sx={{ fontSize: 22 }} />}
+                            </IconButton>
+                        </Tooltip>
+                    </Box>
+                </Box>
+            </Box>
+
+            {/* Main Editor Area */}
+            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                {/* Editors Container - Side by Side */}
+                <Box
+                    sx={{
+                        flex: 1,
+                        display: 'flex',
+                        flexDirection: { xs: 'column', md: 'row' },
+                        overflow: 'hidden',
+                        gap: { xs: 0, md: 1 },
+                        p: { xs: 0, md: 1 },
+                        bgcolor: darkMode ? '#0a0a0a' : '#F0F0F3',
+                    }}
+                >
+                    {/* Input Panel - Glassmorphism Card */}
+                    <Box
+                        sx={{
+                            flex: 1,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            overflow: 'hidden',
+                            borderRadius: { xs: 0, md: '16px' },
+                            // Glassmorphism effect
+                            background: darkMode
+                                ? 'linear-gradient(180deg, rgba(28, 28, 30, 0.95) 0%, rgba(20, 20, 22, 0.98) 100%)'
+                                : 'linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(250, 250, 252, 1) 100%)',
+                            backdropFilter: 'blur(20px) saturate(180%)',
+                            WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                            border: darkMode
+                                ? '1px solid rgba(255, 255, 255, 0.08)'
+                                : '1px solid rgba(0, 0, 0, 0.06)',
+                            boxShadow: darkMode
+                                ? '0 4px 24px rgba(0, 0, 0, 0.3), 0 1px 0 rgba(255, 255, 255, 0.03) inset'
+                                : '0 4px 24px rgba(0, 0, 0, 0.06), 0 1px 0 rgba(255, 255, 255, 0.9) inset',
+                        }}
+                    >
+                        {/* Panel Header */}
+                        <Box
+                            sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                px: 2.5,
+                                py: 1.5,
+                                borderBottom: darkMode
+                                    ? '1px solid rgba(255, 255, 255, 0.06)'
+                                    : '1px solid rgba(0, 0, 0, 0.05)',
+                                background: darkMode
+                                    ? 'linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 100%)'
+                                    : 'linear-gradient(180deg, rgba(255, 255, 255, 0.8) 0%, transparent 100%)',
+                            }}
+                        >
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                <Box
+                                    sx={{
+                                        width: 10,
+                                        height: 10,
+                                        borderRadius: '50%',
+                                        bgcolor: inputYaml
+                                            ? (darkMode ? '#8AB4F8' : '#1A73E8')
+                                            : (darkMode ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.15)'),
+                                        boxShadow: inputYaml
+                                            ? `0 0 8px ${darkMode ? 'rgba(208, 188, 255, 0.5)' : 'rgba(103, 80, 164, 0.4)'}`
+                                            : 'none',
+                                        transition: 'all 0.3s ease',
+                                    }}
+                                />
+                                <Typography
+                                    sx={{
+                                        fontWeight: 600,
+                                        color: darkMode ? '#FFFFFF' : '#1C1B1F',
+                                        fontSize: '14px',
+                                        letterSpacing: '-0.01em',
+                                    }}
+                                >
+                                    Input YAML
+                                </Typography>
+                                {inputYaml && (
+                                    <Chip
+                                        label={`${inputYaml.split('\n').length} lines`}
+                                        size="small"
+                                        sx={{
+                                            height: 20,
+                                            fontSize: '10px',
+                                            fontWeight: 500,
+                                            bgcolor: darkMode ? 'rgba(208, 188, 255, 0.15)' : 'rgba(103, 80, 164, 0.1)',
+                                            color: darkMode ? '#8AB4F8' : '#1A73E8',
+                                        }}
                                     />
-                                </div>
+                                )}
+                            </Box>
+                            {inputYaml && (
+                                <Button
+                                    size="small"
+                                    onClick={handleClear}
+                                    startIcon={<ClearIcon sx={{ fontSize: 14 }} />}
+                                    sx={{
+                                        color: darkMode ? '#F2B8B5' : '#BA1A1A',
+                                        fontSize: '12px',
+                                        fontWeight: 500,
+                                        minWidth: 'auto',
+                                        px: 1.5,
+                                        py: 0.5,
+                                        borderRadius: '8px',
+                                        transition: 'all 0.15s ease',
+                                        '&:hover': {
+                                            bgcolor: darkMode ? 'rgba(242, 184, 181, 0.1)' : 'rgba(186, 26, 26, 0.08)',
+                                        },
+                                    }}
+                                >
+                                    Clear
+                                </Button>
                             )}
+                        </Box>
 
-                            {consoleTab === 'fixes' ? (
-                                changes.length > 0 ? (
+                        {/* Editor */}
+                        <Box sx={{ flex: 1, minHeight: 0 }}>
+                            <CodeEditor
+                                value={inputYaml}
+                                onChange={(value) => setInputYaml(value || '')}
+                                theme={darkMode ? 'dark' : 'light'}
+                            />
+                        </Box>
+                    </Box>
+
+                    {/* Output Panel - Glassmorphism Card */}
+                    <Box
+                        sx={{
+                            flex: 1,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            overflow: 'hidden',
+                            borderRadius: { xs: 0, md: '16px' },
+                            // Glassmorphism effect
+                            background: darkMode
+                                ? 'linear-gradient(180deg, rgba(28, 28, 30, 0.95) 0%, rgba(20, 20, 22, 0.98) 100%)'
+                                : 'linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(250, 250, 252, 1) 100%)',
+                            backdropFilter: 'blur(20px) saturate(180%)',
+                            WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                            border: darkMode
+                                ? '1px solid rgba(255, 255, 255, 0.08)'
+                                : '1px solid rgba(0, 0, 0, 0.06)',
+                            boxShadow: darkMode
+                                ? '0 4px 24px rgba(0, 0, 0, 0.3), 0 1px 0 rgba(255, 255, 255, 0.03) inset'
+                                : '0 4px 24px rgba(0, 0, 0, 0.06), 0 1px 0 rgba(255, 255, 255, 0.9) inset',
+                        }}
+                    >
+                        {/* Panel Header */}
+                        <Box
+                            sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                px: 2.5,
+                                py: 1.5,
+                                borderBottom: darkMode
+                                    ? '1px solid rgba(255, 255, 255, 0.06)'
+                                    : '1px solid rgba(0, 0, 0, 0.05)',
+                                background: darkMode
+                                    ? 'linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 100%)'
+                                    : 'linear-gradient(180deg, rgba(255, 255, 255, 0.8) 0%, transparent 100%)',
+                            }}
+                        >
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                <Box
+                                    sx={{
+                                        width: 10,
+                                        height: 10,
+                                        borderRadius: '50%',
+                                        bgcolor: outputYaml
+                                            ? (isValid ? '#32D74B' : '#FF9F0A')
+                                            : (darkMode ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.15)'),
+                                        boxShadow: outputYaml
+                                            ? `0 0 8px ${isValid ? 'rgba(50, 215, 75, 0.5)' : 'rgba(255, 159, 10, 0.5)'}`
+                                            : 'none',
+                                        transition: 'all 0.3s ease',
+                                    }}
+                                />
+                                <Typography
+                                    sx={{
+                                        fontWeight: 600,
+                                        color: darkMode ? '#FFFFFF' : '#1C1B1F',
+                                        fontSize: '14px',
+                                        letterSpacing: '-0.01em',
+                                    }}
+                                >
+                                    {fixEnabled ? 'Fixed Output' : 'Validation Result'}
+                                </Typography>
+                                {outputYaml && (
+                                    <Chip
+                                        label={isValid ? 'Valid' : `${errors.length} issues`}
+                                        size="small"
+                                        sx={{
+                                            height: 20,
+                                            fontSize: '10px',
+                                            fontWeight: 500,
+                                            bgcolor: isValid
+                                                ? (darkMode ? 'rgba(50, 215, 75, 0.15)' : 'rgba(52, 199, 89, 0.1)')
+                                                : (darkMode ? 'rgba(255, 159, 10, 0.15)' : 'rgba(255, 149, 0, 0.1)'),
+                                            color: isValid
+                                                ? (darkMode ? '#32D74B' : '#34C759')
+                                                : (darkMode ? '#FF9F0A' : '#FF9500'),
+                                        }}
+                                    />
+                                )}
+                            </Box>
+
+                            <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+                                {outputYaml && (
                                     <>
-                                        {/* Confidence Filter */}
-                                        <div className="flex items-center justify-between mb-2 px-1">
-                                            <span className="text-[10px] font-bold text-[var(--color-text-tertiary)] uppercase tracking-wider">
-                                                Applied Fixes
-                                            </span>
-                                            <select
-                                                value={confidenceFilter}
-                                                onChange={(e) => setConfidenceFilter(e.target.value as any)}
-                                                className="bg-[var(--color-bg-secondary)] text-[var(--color-text-secondary)] text-[10px] font-medium rounded px-2 py-1 border border-[var(--glass-border)] outline-none focus:border-[var(--color-blue)]"
+                                        <Tooltip title="Copy" arrow>
+                                            <IconButton
+                                                size="small"
+                                                onClick={handleCopy}
+                                                sx={{
+                                                    color: darkMode ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.5)',
+                                                    borderRadius: '8px',
+                                                    '&:hover': {
+                                                        bgcolor: darkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
+                                                    },
+                                                }}
                                             >
-                                                <option value="all">All Confidence</option>
-                                                <option value="high">High (≥90%)</option>
-                                                <option value="medium">Medium (70-89%)</option>
-                                                <option value="low">Low (&lt;70%)</option>
-                                            </select>
-                                        </div>
-
-                                        {/* Adaptive Grouping */}
-                                        {Object.entries(groupedChanges).map(([category, categoryChanges], groupIdx) => (
-                                            <div key={category} className="animate-fade-in-soft" style={{ animationDelay: `${groupIdx * 100}ms` }}>
-                                                <div className="flex items-center gap-2 mb-2 px-1">
-                                                    <div className={`h-px flex-1 ${category === 'Syntax' ? 'bg-[var(--color-blue)]/30' : category === 'Structure' ? 'bg-[var(--color-purple)]/30' : 'bg-[var(--color-green)]/30'}`}></div>
-                                                    <span className={`text-[10px] font-bold uppercase tracking-wider ${category === 'Syntax' ? 'text-[var(--color-blue)]' : category === 'Structure' ? 'text-[var(--color-purple)]' : 'text-[var(--color-green)]'}`}>
-                                                        {category} ({categoryChanges.length})
-                                                    </span>
-                                                    <div className={`h-px flex-1 ${category === 'Syntax' ? 'bg-[var(--color-blue)]/30' : category === 'Structure' ? 'bg-[var(--color-purple)]/30' : 'bg-[var(--color-green)]/30'}`}></div>
-                                                </div>
-
-                                                <div className="space-y-2">
-                                                    {categoryChanges.map((change, idx) => (
-                                                        <div
-                                                            key={`${category}-${idx}`}
-                                                            className="bg-[var(--color-bg-secondary)]/40 rounded-lg p-3 hover:bg-[var(--color-bg-secondary)]/60 transition-all border border-[var(--glass-border)] hover:border-[var(--color-border)]"
-                                                        >
-                                                            <div className="flex items-start gap-2.5">
-                                                                {/* Line Number */}
-                                                                <div className="w-7 h-7 rounded-md bg-[var(--color-bg-primary)] text-[var(--color-text-secondary)] flex items-center justify-center text-[10px] font-bold flex-shrink-0 border border-[var(--glass-border)]">
-                                                                    {change.line}
-                                                                </div>
-                                                                <div className="flex-1 min-w-0">
-                                                                    <div className="flex items-center justify-between mb-1.5">
-                                                                        {/* Type Badge */}
-                                                                        <span className="inline-block text-[9px] font-bold uppercase text-[var(--color-text-secondary)] tracking-wide px-1.5 py-0.5 rounded bg-[var(--color-bg-primary)] border border-[var(--glass-border)]">
-                                                                            {change.type}
-                                                                        </span>
-
-                                                                        {/* Confidence Badge */}
-                                                                        <span
-                                                                            className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-1"
-                                                                            style={{
-                                                                                backgroundColor: `${getConfidenceColor(change.confidence)}15`,
-                                                                                color: getConfidenceColor(change.confidence)
-                                                                            }}
-                                                                        >
-                                                                            {change.confidence >= 0.9 ? '★' : change.confidence >= 0.7 ? '●' : '⚠️'}
-                                                                            {formatConfidence(change.confidence)}
-                                                                        </span>
-                                                                    </div>
-
-                                                                    {/* Reason */}
-                                                                    <p className="text-[11px] text-[var(--color-text-primary)] mb-2 leading-relaxed font-medium">
-                                                                        {change.reason}
-                                                                    </p>
-
-                                                                    {/* Diff */}
-                                                                    <div className="space-y-1 bg-[var(--color-bg-primary)]/50 rounded p-2 border border-[var(--glass-border)]">
-                                                                        <div className="flex items-start gap-1.5">
-                                                                            <span className="text-[8px] font-bold text-[var(--color-red)] w-6 pt-0.5 opacity-70">WAS</span>
-                                                                            <code className="flex-1 text-[10px] font-mono text-[var(--color-text-secondary)] break-all opacity-70 line-through decoration-[var(--color-red)]/50">
-                                                                                {change.original}
-                                                                            </code>
-                                                                        </div>
-                                                                        <div className="flex items-start gap-1.5">
-                                                                            <span className="text-[8px] font-bold text-[var(--color-green)] w-6 pt-0.5">NOW</span>
-                                                                            <code className="flex-1 text-[10px] font-mono text-[var(--color-text-primary)] break-all font-bold">
-                                                                                {change.fixed}
-                                                                            </code>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        ))}
+                                                <CopyIcon sx={{ fontSize: 18 }} />
+                                            </IconButton>
+                                        </Tooltip>
+                                        <Tooltip title="Download" arrow>
+                                            <IconButton
+                                                size="small"
+                                                onClick={handleDownload}
+                                                sx={{
+                                                    color: darkMode ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.5)',
+                                                    borderRadius: '8px',
+                                                    '&:hover': {
+                                                        bgcolor: darkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
+                                                    },
+                                                }}
+                                            >
+                                                <DownloadIcon sx={{ fontSize: 18 }} />
+                                            </IconButton>
+                                        </Tooltip>
+                                        <Button
+                                            size="small"
+                                            variant={showDiff ? 'contained' : 'text'}
+                                            onClick={() => setShowDiff(!showDiff)}
+                                            startIcon={<DiffIcon sx={{ fontSize: 14 }} />}
+                                            sx={{
+                                                color: showDiff ? '#FFF' : (darkMode ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.5)'),
+                                                bgcolor: showDiff ? (darkMode ? '#1A73E8' : '#1A73E8') : 'transparent',
+                                                borderRadius: '8px',
+                                                fontSize: '11px',
+                                                fontWeight: 500,
+                                                minWidth: 'auto',
+                                                px: 1.5,
+                                                '&:hover': {
+                                                    bgcolor: showDiff
+                                                        ? '#5195F4'
+                                                        : (darkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)'),
+                                                },
+                                            }}
+                                        >
+                                            Diff
+                                        </Button>
                                     </>
-                                ) : (
-                                    <div className="flex flex-col items-center justify-center h-40 text-[var(--color-text-tertiary)] animate-fade-in-soft">
-                                        <div className="w-12 h-12 rounded-xl bg-[var(--color-bg-secondary)]/50 flex items-center justify-center mb-3">
-                                            <svg className="w-6 h-6 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 13l4 4L19 7" />
-                                            </svg>
-                                        </div>
-                                        <p className="text-xs font-medium">No fixes applied</p>
-                                        <p className="text-[10px] mt-0.5 opacity-50">Run validation to see fixes</p>
-                                    </div>
-                                )
-                            ) : (
-                                errors.length > 0 ? (
-                                    Object.entries(groupedErrors).map(([severity, severityErrors], groupIdx) => (
-                                        <div key={severity} className="space-y-1.5 animate-fade-in-soft" style={{ animationDelay: `${groupIdx * 100}ms` }}>
-                                            <div className="flex items-center gap-1.5 px-0.5 py-1">
-                                                <span className={`w-1.5 h-1.5 rounded-full ${severity === 'critical' || severity === 'error' ? 'bg-[var(--color-red)]' : severity === 'warning' ? 'bg-[var(--color-orange)]' : 'bg-[var(--color-blue)]'}`}></span>
-                                                <span className="text-[9px] font-bold uppercase tracking-wide text-[var(--color-text-tertiary)]">
-                                                    {severity} · {severityErrors.length}
-                                                </span>
-                                            </div>
-                                            {severityErrors.map((error, idx) => (
-                                                <div
-                                                    key={idx}
-                                                    className={`bg-[var(--color-bg-secondary)]/40 rounded-lg p-3 hover:bg-[var(--color-bg-secondary)]/60 transition-all border-l-[3px] ${severity === 'critical' || severity === 'error' ? 'border-l-[var(--color-red)]' :
-                                                        severity === 'warning' ? 'border-l-[var(--color-orange)]' : 'border-l-[var(--color-blue)]'
-                                                        }`}
-                                                >
-                                                    <div className="flex items-center gap-1.5 mb-1.5">
-                                                        <span className="text-[9px] font-mono bg-[var(--color-bg-primary)]/50 px-1.5 py-0.5 rounded text-[var(--color-text-secondary)] font-bold">
-                                                            L{error.line}
-                                                        </span>
-                                                        {error.code && (
-                                                            <span className="text-[9px] font-mono text-[var(--color-text-tertiary)]">
-                                                                {error.code}
-                                                            </span>
-                                                        )}
-                                                        <span className="ml-auto text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-[var(--color-bg-primary)] text-[var(--color-text-tertiary)]">
-                                                            {error.severity}
-                                                        </span>
-                                                    </div>
-                                                    <p className="text-[11px] font-medium text-[var(--color-text-primary)] leading-relaxed">
-                                                        {error.message}
-                                                    </p>
-                                                    {error.fixable && (
-                                                        <div className="mt-2 flex items-center gap-1 text-[10px] text-[var(--color-blue)] font-medium">
-                                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                                            </svg>
-                                                            Auto-fix available
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ))
-                                ) : (
-                                    <div className="flex flex-col items-center justify-center h-40 text-[var(--color-text-tertiary)] animate-fade-in-soft">
-                                        <div className="w-12 h-12 rounded-xl bg-[var(--color-bg-secondary)]/50 flex items-center justify-center mb-3">
-                                            <svg className="w-6 h-6 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
-                                        </div>
-                                        <p className="text-xs font-medium">No errors found</p>
-                                        <p className="text-[10px] mt-0.5 opacity-50">Your YAML is valid!</p>
-                                    </div>
-                                )
-                            )}
-                        </div>
-                    </aside>
-                )}
-            </div>
+                                )}
+                            </Box>
+                        </Box>
 
-            {/* Documentation Overlay */}
+                        {/* Editor */}
+                        <Box sx={{ flex: 1, minHeight: 0, position: 'relative' }}>
+                            {!outputYaml && (
+                                <Box
+                                    sx={{
+                                        position: 'absolute',
+                                        inset: 0,
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: darkMode ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.25)',
+                                        zIndex: 10,
+                                        pointerEvents: 'none',
+                                    }}
+                                >
+                                    <CheckIcon sx={{ fontSize: 56, opacity: 0.5, mb: 1.5 }} />
+                                    <Typography sx={{ fontWeight: 600, fontSize: '15px', mb: 0.5 }}>
+                                        Ready to validate
+                                    </Typography>
+                                    <Typography sx={{ fontSize: '13px', opacity: 0.7 }}>
+                                        Paste YAML and click Validate
+                                    </Typography>
+                                </Box>
+                            )}
+                            <CodeEditor
+                                value={outputYaml}
+                                theme={darkMode ? 'dark' : 'light'}
+                                readOnly={true}
+                                diffMode={showDiff}
+                                originalValue={inputYaml}
+                                modifiedValue={outputYaml}
+                            />
+                        </Box>
+                    </Box>
+                </Box>
+
+                {/* Footer - Server Status Bar */}
+                <Box
+                    component="footer"
+                    sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        px: { xs: 2, md: 3 },
+                        py: 1,
+                        minHeight: 36,
+                        background: darkMode
+                            ? 'linear-gradient(180deg, rgba(18, 18, 20, 0.95) 0%, rgba(12, 12, 14, 0.98) 100%)'
+                            : 'linear-gradient(180deg, rgba(250, 250, 252, 0.98) 0%, rgba(245, 245, 247, 1) 100%)',
+                        borderTop: darkMode
+                            ? '1px solid rgba(255, 255, 255, 0.06)'
+                            : '1px solid rgba(0, 0, 0, 0.06)',
+                        backdropFilter: 'blur(12px)',
+                        WebkitBackdropFilter: 'blur(12px)',
+                    }}
+                >
+                    {/* Left - Server Status */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Box
+                            sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 0.75,
+                                px: 1,
+                                py: 0.25,
+                                borderRadius: '6px',
+                                bgcolor: darkMode ? 'rgba(50, 215, 75, 0.1)' : 'rgba(52, 199, 89, 0.08)',
+                            }}
+                        >
+                            <Box
+                                sx={{
+                                    width: 6,
+                                    height: 6,
+                                    borderRadius: '50%',
+                                    bgcolor: '#32D74B',
+                                    boxShadow: '0 0 6px rgba(50, 215, 75, 0.6)',
+                                    animation: 'pulse 2s ease-in-out infinite',
+                                    '@keyframes pulse': {
+                                        '0%, 100%': { opacity: 1 },
+                                        '50%': { opacity: 0.5 },
+                                    },
+                                }}
+                            />
+                            <Typography
+                                sx={{
+                                    fontSize: '11px',
+                                    fontWeight: 500,
+                                    color: darkMode ? '#32D74B' : '#34C759',
+                                    letterSpacing: '-0.01em',
+                                }}
+                            >
+                                Server Connected
+                            </Typography>
+                        </Box>
+                        <Typography
+                            sx={{
+                                fontSize: '11px',
+                                color: darkMode ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.35)',
+                            }}
+                        >
+                            localhost:3001
+                        </Typography>
+                    </Box>
+
+                    {/* Center - Stats */}
+                    <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center', gap: 2 }}>
+                        {processingTime > 0 && (
+                            <Typography
+                                sx={{
+                                    fontSize: '11px',
+                                    color: darkMode ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.35)',
+                                }}
+                            >
+                                Last validation: {processingTime}ms
+                            </Typography>
+                        )}
+                        {changes.length > 0 && (
+                            <Typography
+                                sx={{
+                                    fontSize: '11px',
+                                    color: darkMode ? '#8AB4F8' : '#1A73E8',
+                                    fontWeight: 500,
+                                }}
+                            >
+                                {changes.length} fixes applied
+                            </Typography>
+                        )}
+                    </Box>
+
+                    {/* Right - Version */}
+                    <Typography
+                        sx={{
+                            fontSize: '11px',
+                            color: darkMode ? 'rgba(255, 255, 255, 0.35)' : 'rgba(0, 0, 0, 0.3)',
+                        }}
+                    >
+                        v1.0.0
+                    </Typography>
+                </Box>
+            </Box>
+
+            {/* Console Drawer - Clean Google MD3 Design */}
+            <Drawer
+                anchor="right"
+                open={showConsole}
+                onClose={() => setShowConsole(false)}
+                variant="temporary"
+                sx={{
+                    '& .MuiBackdrop-root': {
+                        bgcolor: darkMode ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.25)',
+                        backdropFilter: 'blur(2px)',
+                    },
+                    '& .MuiDrawer-paper': {
+                        width: { xs: '100%', md: 450 },
+                        boxSizing: 'border-box',
+                        bgcolor: darkMode ? '#050505' : '#FFFFFF', // Darker background
+                        borderLeft: darkMode ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid rgba(0, 0, 0, 0.06)',
+                        background: darkMode
+                            ? '#050505'
+                            : '#FFFFFF',
+                        backdropFilter: 'none',
+                    },
+                }}
+            >
+                <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                    {/* Clean Header - No Icon */}
+                    <Box
+                        sx={{
+                            px: 2.5,
+                            py: 2,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            borderBottom: darkMode
+                                ? '1px solid rgba(255, 255, 255, 0.06)'
+                                : '1px solid rgba(0, 0, 0, 0.06)',
+                        }}
+                    >
+                        <Box>
+                            <Typography
+                                sx={{
+                                    fontWeight: 500,
+                                    fontSize: '18px',
+                                    color: darkMode ? '#E3E3E3' : '#202124',
+                                    letterSpacing: '-0.01em',
+                                }}
+                            >
+                                Console
+                            </Typography>
+                            <Typography
+                                sx={{
+                                    fontSize: '12px',
+                                    color: darkMode ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)',
+                                    mt: 0.25,
+                                }}
+                            >
+                                {changes.length + errors.length === 0
+                                    ? 'No results yet'
+                                    : `${changes.length} fixes, ${errors.length} errors`}
+                            </Typography>
+                        </Box>
+                        <IconButton
+                            onClick={() => setShowConsole(false)}
+                            size="small"
+                            sx={{
+                                color: darkMode ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.5)',
+                                '&:hover': {
+                                    bgcolor: darkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+                                },
+                            }}
+                        >
+                            <CloseIcon sx={{ fontSize: 20 }} />
+                        </IconButton>
+                    </Box>
+
+                    {/* Google-style Pill Tabs */}
+                    <Box
+                        sx={{
+                            px: 2.5,
+                            py: 1.5,
+                            display: 'flex',
+                            gap: 1,
+                            borderBottom: darkMode
+                                ? '1px solid rgba(255, 255, 255, 0.06)'
+                                : '1px solid rgba(0, 0, 0, 0.06)',
+                        }}
+                    >
+                        <Button
+                            size="small"
+                            onClick={() => setConsoleTab('fixes')}
+                            startIcon={<CheckIcon sx={{ fontSize: 16 }} />}
+                            sx={{
+                                borderRadius: '20px',
+                                px: 2,
+                                py: 0.75,
+                                fontSize: '13px',
+                                fontWeight: 500,
+                                textTransform: 'none',
+                                minWidth: 'auto',
+                                bgcolor: consoleTab === 'fixes'
+                                    ? (darkMode ? 'rgba(129, 201, 149, 0.15)' : 'rgba(30, 142, 62, 0.1)')
+                                    : 'transparent',
+                                color: consoleTab === 'fixes'
+                                    ? (darkMode ? '#81C995' : '#1E8E3E')
+                                    : (darkMode ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'),
+                                border: consoleTab === 'fixes'
+                                    ? (darkMode ? '1px solid rgba(129, 201, 149, 0.3)' : '1px solid rgba(30, 142, 62, 0.2)')
+                                    : '1px solid transparent',
+                                '&:hover': {
+                                    bgcolor: consoleTab === 'fixes'
+                                        ? (darkMode ? 'rgba(129, 201, 149, 0.2)' : 'rgba(30, 142, 62, 0.15)')
+                                        : (darkMode ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.04)'),
+                                },
+                            }}
+                        >
+                            Fixes{changes.length > 0 && ` (${changes.length})`}
+                        </Button>
+                        <Button
+                            size="small"
+                            onClick={() => setConsoleTab('errors')}
+                            startIcon={<ErrorIcon sx={{ fontSize: 16 }} />}
+                            sx={{
+                                borderRadius: '20px',
+                                px: 2,
+                                py: 0.75,
+                                fontSize: '13px',
+                                fontWeight: 500,
+                                textTransform: 'none',
+                                minWidth: 'auto',
+                                bgcolor: consoleTab === 'errors'
+                                    ? (darkMode ? 'rgba(242, 139, 130, 0.15)' : 'rgba(217, 48, 37, 0.1)')
+                                    : 'transparent',
+                                color: consoleTab === 'errors'
+                                    ? (darkMode ? '#F28B82' : '#D93025')
+                                    : (darkMode ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'),
+                                border: consoleTab === 'errors'
+                                    ? (darkMode ? '1px solid rgba(242, 139, 130, 0.3)' : '1px solid rgba(217, 48, 37, 0.2)')
+                                    : '1px solid transparent',
+                                '&:hover': {
+                                    bgcolor: consoleTab === 'errors'
+                                        ? (darkMode ? 'rgba(242, 139, 130, 0.2)' : 'rgba(217, 48, 37, 0.15)')
+                                        : (darkMode ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.04)'),
+                                },
+                            }}
+                        >
+                            Errors{errors.length > 0 && ` (${errors.length})`}
+                        </Button>
+                    </Box>
+
+                    {/* Content Area */}
+                    <Box
+                        sx={{
+                            flex: 1,
+                            overflow: 'auto',
+                            px: 2.5,
+                            py: 2,
+                            '&::-webkit-scrollbar': {
+                                width: 4,
+                            },
+                            '&::-webkit-scrollbar-thumb': {
+                                bgcolor: darkMode ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)',
+                                borderRadius: 2,
+                            },
+                        }}
+                    >
+                        {/* Statistics Panel */}
+                        {(changes.length > 0 || errors.length > 0) && (
+                            <Box
+                                sx={{
+                                    p: 2,
+                                    mb: 2,
+                                    borderRadius: '12px',
+                                    bgcolor: darkMode ? 'rgba(138, 180, 248, 0.08)' : 'rgba(26, 115, 232, 0.05)',
+                                    border: darkMode
+                                        ? '1px solid rgba(138, 180, 248, 0.12)'
+                                        : '1px solid rgba(26, 115, 232, 0.1)',
+                                }}
+                            >
+                                <StatisticsPanel
+                                    totalIssues={stats.totalIssues}
+                                    fixedCount={stats.fixedCount}
+                                    processingTimeMs={stats.processingTimeMs}
+                                    confidence={stats.overallConfidence}
+                                />
+                            </Box>
+                        )}
+
+                        {/* Fixes Tab */}
+                        {consoleTab === 'fixes' ? (
+                            changes.length > 0 ? (
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                    {Object.entries(groupedChanges).map(([category, categoryChanges]) => (
+                                        <Box key={category}>
+                                            <Typography
+                                                sx={{
+                                                    fontSize: '12px',
+                                                    fontWeight: 500,
+                                                    color: darkMode ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)',
+                                                    mb: 1.5,
+                                                    textTransform: 'capitalize',
+                                                }}
+                                            >
+                                                {category} ({categoryChanges.length})
+                                            </Typography>
+                                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                                {categoryChanges.map((change, idx) => (
+                                                    <Box
+                                                        key={idx}
+                                                        sx={{
+                                                            p: 2,
+                                                            borderRadius: '12px',
+                                                            bgcolor: darkMode ? '#1E1E1E' : '#FFFFFF',
+                                                            border: darkMode
+                                                                ? '1px solid rgba(255, 255, 255, 0.06)'
+                                                                : '1px solid rgba(0, 0, 0, 0.04)',
+                                                        }}
+                                                    >
+                                                        <Box sx={{ display: 'flex', gap: 1, mb: 1.5, flexWrap: 'wrap' }}>
+                                                            <Chip
+                                                                label={change.type}
+                                                                size="small"
+                                                                sx={{
+                                                                    height: 22,
+                                                                    fontSize: '11px',
+                                                                    fontWeight: 500,
+                                                                    bgcolor: darkMode ? 'rgba(138, 180, 248, 0.12)' : 'rgba(26, 115, 232, 0.08)',
+                                                                    color: darkMode ? '#8AB4F8' : '#1A73E8',
+                                                                }}
+                                                            />
+                                                            <Chip
+                                                                label={formatConfidence(change.confidence)}
+                                                                size="small"
+                                                                sx={{
+                                                                    height: 22,
+                                                                    fontSize: '11px',
+                                                                    fontWeight: 500,
+                                                                    bgcolor: `${getConfidenceColor(change.confidence)}15`,
+                                                                    color: getConfidenceColor(change.confidence),
+                                                                }}
+                                                            />
+                                                        </Box>
+                                                        <Typography
+                                                            sx={{
+                                                                fontSize: '13px',
+                                                                color: darkMode ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.75)',
+                                                                mb: 1.5,
+                                                                lineHeight: 1.5,
+                                                            }}
+                                                        >
+                                                            {change.reason}
+                                                        </Typography>
+                                                        <Box
+                                                            sx={{
+                                                                p: 1.5,
+                                                                borderRadius: '8px',
+                                                                bgcolor: darkMode ? 'rgba(0, 0, 0, 0.25)' : '#FFFFFF',
+                                                                fontFamily: '"Roboto Mono", monospace',
+                                                                fontSize: '12px',
+                                                                lineHeight: 1.5,
+                                                                border: darkMode
+                                                                    ? '1px solid rgba(255, 255, 255, 0.05)'
+                                                                    : '1px solid rgba(0, 0, 0, 0.06)',
+                                                            }}
+                                                        >
+                                                            <Box
+                                                                sx={{
+                                                                    color: darkMode ? '#F28B82' : '#D93025',
+                                                                    textDecoration: 'line-through',
+                                                                    opacity: 0.7,
+                                                                    mb: 0.5,
+                                                                    wordBreak: 'break-word',
+                                                                }}
+                                                            >
+                                                                − {change.original}
+                                                            </Box>
+                                                            <Box
+                                                                sx={{
+                                                                    color: darkMode ? '#81C995' : '#1E8E3E',
+                                                                    wordBreak: 'break-word',
+                                                                }}
+                                                            >
+                                                                + {change.fixed}
+                                                            </Box>
+                                                        </Box>
+                                                    </Box>
+                                                ))}
+                                            </Box>
+                                        </Box>
+                                    ))}
+                                </Box>
+                            ) : (
+                                <Box
+                                    sx={{
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        py: 6,
+                                        textAlign: 'center',
+                                    }}
+                                >
+                                    <CheckIcon
+                                        sx={{
+                                            fontSize: 48,
+                                            color: darkMode ? 'rgba(129, 201, 149, 0.3)' : 'rgba(30, 142, 62, 0.2)',
+                                            mb: 2,
+                                        }}
+                                    />
+                                    <Typography
+                                        sx={{
+                                            fontSize: '14px',
+                                            fontWeight: 500,
+                                            color: darkMode ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)',
+                                            mb: 0.5,
+                                        }}
+                                    >
+                                        No fixes yet
+                                    </Typography>
+                                    <Typography
+                                        sx={{
+                                            fontSize: '13px',
+                                            color: darkMode ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)',
+                                        }}
+                                    >
+                                        Validate YAML to see fixes
+                                    </Typography>
+                                </Box>
+                            )
+                        ) : (
+                            /* Errors Tab */
+                            errors.length > 0 ? (
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                    {Object.entries(groupedErrors).map(([severity, severityErrors]) => (
+                                        <Box key={severity}>
+                                            <Typography
+                                                sx={{
+                                                    fontSize: '12px',
+                                                    fontWeight: 500,
+                                                    color: severity === 'error'
+                                                        ? (darkMode ? '#F28B82' : '#D93025')
+                                                        : severity === 'warning'
+                                                            ? (darkMode ? '#FDD663' : '#F29900')
+                                                            : (darkMode ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)'),
+                                                    mb: 1.5,
+                                                    textTransform: 'capitalize',
+                                                }}
+                                            >
+                                                {severity} ({severityErrors.length})
+                                            </Typography>
+                                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                                {severityErrors.map((error, idx) => (
+                                                    <Box
+                                                        key={idx}
+                                                        sx={{
+                                                            p: 2,
+                                                            borderRadius: '12px',
+                                                            bgcolor: darkMode ? '#1E1E1E' : '#FFFFFF',
+                                                            border: darkMode ? '1px solid rgba(255, 255, 255, 0.06)' : '1px solid rgba(0, 0, 0, 0.04)',
+                                                            borderLeft: '3px solid',
+                                                            borderLeftColor: severity === 'error'
+                                                                ? (darkMode ? '#F28B82' : '#D93025')
+                                                                : severity === 'warning'
+                                                                    ? (darkMode ? '#FDD663' : '#F29900')
+                                                                    : (darkMode ? '#8AB4F8' : '#1A73E8'),
+                                                        }}
+                                                    >
+                                                        <Box sx={{ display: 'flex', gap: 1, mb: 1, flexWrap: 'wrap' }}>
+                                                            <Chip
+                                                                label={`Line ${error.line}`}
+                                                                size="small"
+                                                                sx={{
+                                                                    height: 22,
+                                                                    fontSize: '11px',
+                                                                    fontWeight: 500,
+                                                                    bgcolor: darkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
+                                                                    color: darkMode ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.6)',
+                                                                }}
+                                                            />
+                                                            {error.code && (
+                                                                <Chip
+                                                                    label={error.code}
+                                                                    size="small"
+                                                                    variant="outlined"
+                                                                    sx={{
+                                                                        height: 22,
+                                                                        fontSize: '11px',
+                                                                        fontWeight: 500,
+                                                                        borderColor: darkMode ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.12)',
+                                                                        color: darkMode ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.45)',
+                                                                    }}
+                                                                />
+                                                            )}
+                                                        </Box>
+                                                        <Typography
+                                                            sx={{
+                                                                fontSize: '13px',
+                                                                color: darkMode ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.75)',
+                                                                lineHeight: 1.5,
+                                                            }}
+                                                        >
+                                                            {error.message}
+                                                        </Typography>
+                                                    </Box>
+                                                ))}
+                                            </Box>
+                                        </Box>
+                                    ))}
+                                </Box>
+                            ) : (
+                                <Box
+                                    sx={{
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        py: 6,
+                                        textAlign: 'center',
+                                    }}
+                                >
+                                    <CheckIcon
+                                        sx={{
+                                            fontSize: 48,
+                                            color: darkMode ? 'rgba(129, 201, 149, 0.3)' : 'rgba(30, 142, 62, 0.2)',
+                                            mb: 2,
+                                        }}
+                                    />
+                                    <Typography
+                                        sx={{
+                                            fontSize: '14px',
+                                            fontWeight: 500,
+                                            color: darkMode ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)',
+                                            mb: 0.5,
+                                        }}
+                                    >
+                                        No errors
+                                    </Typography>
+                                    <Typography
+                                        sx={{
+                                            fontSize: '13px',
+                                            color: darkMode ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)',
+                                        }}
+                                    >
+                                        YAML is valid
+                                    </Typography>
+                                </Box>
+                            )
+                        )}
+                    </Box>
+                </Box>
+            </Drawer>
+
+            {/* Documentation Modal */}
             {showDocumentation && (
                 <Documentation onClose={() => setShowDocumentation(false)} />
             )}
 
-            {/* Toast Container */}
-            <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">
-                {toasts.map(toast => (
-                    <div
-                        key={toast.id}
-                        className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg backdrop-blur-xl animate-slide-up ${toast.type === 'success' ? 'bg-[var(--color-green)]/10 text-[var(--color-green)] border border-[var(--color-green)]/20' :
-                            toast.type === 'error' ? 'bg-[var(--color-red)]/10 text-[var(--color-red)] border border-[var(--color-red)]/20' :
-                                'bg-[var(--color-blue)]/10 text-[var(--color-blue)] border border-[var(--color-blue)]/20'
-                            }`}
+            {/* Snackbar Toasts */}
+            {toasts.map(toast => (
+                <Snackbar
+                    key={toast.id}
+                    open={true}
+                    autoHideDuration={3000}
+                    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                >
+                    <Alert
+                        severity={toast.type === 'success' ? 'success' : toast.type === 'error' ? 'error' : 'info'}
+                        variant="filled"
+                        sx={{ borderRadius: '10px' }}
                     >
-                        {toast.type === 'success' ? (
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                        ) : toast.type === 'error' ? (
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                        ) : (
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                        )}
-                        <span className="text-sm font-medium">{toast.message}</span>
-                    </div>
-                ))}
-            </div>
-
-            {/* Confetti */}
-            {showConfetti && (
-                <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
-                    {[...Array(50)].map((_, i) => {
-                        const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
-                        return (
-                            <div
-                                key={i}
-                                className="confetti-piece absolute w-2 h-2 rounded-sm"
-                                style={{
-                                    left: `${Math.random() * 100}%`,
-                                    top: '-10px',
-                                    backgroundColor: colors[Math.floor(Math.random() * colors.length)],
-                                    animation: `fall ${Math.random() * 3 + 2}s linear forwards`,
-                                    animationDelay: `${Math.random() * 2}s`
-                                }}
-                            />
-                        );
-                    })}
-                </div>
-            )}
-
-            <style>{`
-                @keyframes fall {
-                    to {
-                        transform: translateY(100vh) rotate(720deg);
-                    }
-                }
-            `}</style>
-        </div>
+                        {toast.message}
+                    </Alert>
+                </Snackbar>
+            ))}
+        </Box>
     );
 };

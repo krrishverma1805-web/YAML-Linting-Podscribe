@@ -1,6 +1,8 @@
-/* Apple-Inspired Design System for YAML Validator */
+/* Material Design 3 + Custom Design System */
 
-/* SF Pro Font Family - Using system fonts as fallback */
+/* Roboto Font Family for Material Design 3 */
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
+/* Inter as fallback */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 @tailwind base;
