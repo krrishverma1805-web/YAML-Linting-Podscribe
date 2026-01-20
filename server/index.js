@@ -1,15 +1,25 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import bodyParser from 'body-parser';
 import yaml from 'js-yaml';
 import validateRouter from './routes/validate.js';
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
+
+// ES modules helper for dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.text({ type: 'application/x-yaml' }));
+
+// Serve static files from the Vite build directory
+const distPath = path.join(__dirname, '../dist');
+app.use(express.static(distPath));
 
 // YAML Validator API Routes
 app.use('/api/yaml', validateRouter);
@@ -611,7 +621,15 @@ const validateK8sResource = (doc, yamlContent) => {
     return errors;
 };
 
-// API endpoint
+// SPA catch-all middleware: serve index.html for any non-API routes that weren't handled
+app.use((req, res, next) => {
+    if (req.method === 'GET' && !req.path.startsWith('/api')) {
+        res.sendFile(path.join(distPath, 'index.html'));
+    } else {
+        next();
+    }
+});
+
 app.post('/api/validate', (req, res) => {
     const yamlContent = req.body.yaml;
 

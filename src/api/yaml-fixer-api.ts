@@ -117,7 +117,7 @@ export interface ValidateResponse {
 // ==========================================
 
 const API_BASE_URL = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
-    ? `http://${window.location.hostname}:3001`
+    ? '' // Use relative path in production
     : 'http://localhost:3001';
 
 /**

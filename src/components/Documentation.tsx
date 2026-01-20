@@ -12,8 +12,6 @@ import {
     ListItemText,
     Grid,
     Chip,
-    useTheme,
-    alpha,
     Table,
     TableBody,
     TableCell,
@@ -23,45 +21,32 @@ import {
 } from '@mui/material';
 import {
     MenuBook as OverviewIcon,
-    RocketLaunch as QuickStartIcon,
     Loop as PipelineIcon,
     Build as FixerIcon,
     Psychology as SemanticIcon,
     LibraryBooks as KnowledgeIcon,
-    Analytics as ConfidenceIcon,
     Terminal as CliIcon,
     Api as ApiIcon,
     AccountTree as ArchitectureIcon,
-    Help as FaqIcon,
     Search as SearchIcon,
     Close as CloseIcon,
     Speed as SpeedIcon,
-    Security as SecurityIcon,
-    AutoFixHigh as AutoFixIcon,
     CheckCircle as CheckIcon,
-    Storage as StorageIcon,
     TouchApp as InterfaceIcon,
-    Settings as BackendIcon,
-    UploadFile as UploadIcon,
-    Policy as RegoIcon,
-    PlayArrow as ValidateIcon,
-    Terminal as ConsoleIcon,
-    Code as CodeIcon,
-    Palette as DesignIcon,
-    BugReport as TestIcon,
     Tune as ConfigIcon,
-    DataObject as ExamplesIcon
+    DataObject as ExamplesIcon,
+    FolderOpen as ProjectIcon,
+    Brush as StyleIcon
 } from '@mui/icons-material';
 
 interface DocumentationProps {
     onClose?: () => void;
+    darkMode: boolean;
 }
 
-export const Documentation: React.FC<DocumentationProps> = ({ onClose }) => {
-    const theme = useTheme();
+export const Documentation: React.FC<DocumentationProps> = ({ onClose, darkMode: isDarkMode }) => {
     const [activeSection, setActiveSection] = useState('overview');
     const [searchQuery, setSearchQuery] = useState('');
-    const isDarkMode = theme.palette.mode === 'dark';
 
     const sections = [
         { id: 'overview', title: 'Overview', icon: <OverviewIcon fontSize="small" /> },
@@ -77,8 +62,8 @@ export const Documentation: React.FC<DocumentationProps> = ({ onClose }) => {
         { id: 'configuration', title: 'Configuration', icon: <ConfigIcon fontSize="small" /> },
         { id: 'examples', title: 'Real-World Examples', icon: <ExamplesIcon fontSize="small" /> },
         { id: 'performance', title: 'Performance', icon: <SpeedIcon fontSize="small" /> },
-        { id: 'project-structure', title: 'Project Structure', icon: <CodeIcon fontSize="small" /> },
-        { id: 'design-system', title: 'Design System', icon: <DesignIcon fontSize="small" /> },
+        { id: 'project-structure', title: 'Project Structure', icon: <ProjectIcon fontSize="small" /> },
+        { id: 'design-system', title: 'Design System', icon: <StyleIcon fontSize="small" /> },
     ];
 
     const scrollToSection = (id: string) => {
@@ -125,15 +110,8 @@ export const Documentation: React.FC<DocumentationProps> = ({ onClose }) => {
         gap: 1.5,
     };
 
-    const subHeadingStyle = {
-        fontWeight: 600,
-        color: isDarkMode ? '#e0e0e0' : '#333',
-        mb: 1.5,
-        mt: 3
-    };
-
     const paragraphStyle = {
-        color: 'text.secondary',
+        color: isDarkMode ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary',
         mb: 2,
         lineHeight: 1.6,
         fontSize: '15px'
@@ -145,6 +123,7 @@ export const Documentation: React.FC<DocumentationProps> = ({ onClose }) => {
         bgcolor: isDarkMode ? 'rgba(255, 255, 255, 0.03)' : '#FFFFFF',
         border: `1px solid ${isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)'}`,
         height: '100%',
+        color: isDarkMode ? '#fff' : 'inherit'
     };
 
     const codeBlockStyle = {
@@ -163,7 +142,7 @@ export const Documentation: React.FC<DocumentationProps> = ({ onClose }) => {
     const SectionWrapper = ({ id, children }: { id: string, children: React.ReactNode }) => (
         <Box id={id} sx={{ scrollMarginTop: 100, mb: 8 }}>
             {children}
-            <Divider sx={{ mt: 6, opacity: 0.5 }} />
+            <Divider sx={{ mt: 6, opacity: 0.5, borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }} />
         </Box>
     );
 
@@ -189,17 +168,16 @@ export const Documentation: React.FC<DocumentationProps> = ({ onClose }) => {
                 }}
             >
                 <Box sx={{ p: 3, borderBottom: `1px solid ${isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}` }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <Typography variant="h6" fontWeight={800} sx={{ background: 'linear-gradient(45deg, #1A73E8, #8AB4F8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                             Podscribe
                         </Typography>
                         {onClose && (
-                            <IconButton onClick={onClose} size="small">
+                            <IconButton onClick={onClose} size="small" sx={{ color: isDarkMode ? '#fff' : 'inherit' }}>
                                 <CloseIcon fontSize="small" />
                             </IconButton>
                         )}
                     </Box>
-                    <Typography variant="caption" color="text.secondary">Documentation v2.0</Typography>
                 </Box>
 
                 <Box sx={{ p: 2 }}>
@@ -216,7 +194,7 @@ export const Documentation: React.FC<DocumentationProps> = ({ onClose }) => {
                             placeholder="Search docs..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            sx={{ pl: 5, pr: 2, py: 0.5, width: '100%', fontSize: '14px' }}
+                            sx={{ pl: 5, pr: 2, py: 0.5, width: '100%', fontSize: '14px', color: isDarkMode ? '#fff' : 'inherit' }}
                         />
                     </Box>
                 </Box>
@@ -242,7 +220,7 @@ export const Documentation: React.FC<DocumentationProps> = ({ onClose }) => {
                             </ListItemIcon>
                             <ListItemText
                                 primary={section.title}
-                                primaryTypographyProps={{ fontSize: '13px', fontWeight: 500 }}
+                                primaryTypographyProps={{ fontSize: '13px', fontWeight: 500, color: isDarkMode ? '#e0e0e0' : 'inherit' }}
                             />
                         </ListItemButton>
                     ))}
@@ -291,7 +269,7 @@ export const Documentation: React.FC<DocumentationProps> = ({ onClose }) => {
                                 { title: 'Fuzzy Matching', desc: 'Auto-corrects 80+ common typos like "contaienrs" or "metdata".' },
                                 { title: 'Type Coercion', desc: 'Converts words to numbers ("three" -> 3) and handles boolean strings.' },
                             ].map((item, idx) => (
-                                <Grid item xs={12} md={6} key={idx}>
+                                <Grid size={{ xs: 12, md: 6 }} key={idx}>
                                     <Paper elevation={0} sx={cardStyle}>
                                         <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>{item.title}</Typography>
                                         <Typography variant="body2" color="text.secondary">{item.desc}</Typography>
@@ -333,10 +311,10 @@ export const Documentation: React.FC<DocumentationProps> = ({ onClose }) => {
                                             { id: 9, name: 'Indent', purpose: 'Dedicated indentation validator', file: 'indentation-validator.ts' },
                                         ].map((row) => (
                                             <TableRow key={row.id}>
-                                                <TableCell sx={{ fontWeight: 700 }}>{row.id}</TableCell>
-                                                <TableCell>{row.name}</TableCell>
+                                                <TableCell sx={{ fontWeight: 700, color: isDarkMode ? '#e0e0e0' : 'inherit' }}>{row.id}</TableCell>
+                                                <TableCell sx={{ color: isDarkMode ? '#e0e0e0' : 'inherit' }}>{row.name}</TableCell>
                                                 <TableCell color="text.secondary">{row.purpose}</TableCell>
-                                                <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{row.file}</TableCell>
+                                                <TableCell sx={{ fontFamily: 'monospace', fontSize: 12, color: isDarkMode ? '#8AB4F8' : 'inherit' }}>{row.file}</TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
@@ -350,17 +328,18 @@ export const Documentation: React.FC<DocumentationProps> = ({ onClose }) => {
                         <Typography variant="h4" sx={headingStyle}>
                             <SemanticIcon sx={{ color: '#1A73E8' }} /> Intelligent Semantic Validator
                         </Typography>
-                        <Typography sx={paragraphStyle}>
-                            Our next-generation validator understands Kubernetes YAML structure semantically, not just through pattern matching.
-                        </Typography>
                         <List>
-                            <ListItemButton><ListItemText primary="✅ 5-Pass Repair Pipeline" secondary="Multi-pass fixing with 95%+ accuracy" /></ListItemButton>
-                            <Divider component="li" />
-                            <ListItemButton><ListItemText primary="✅ Context-Aware Key Detection" secondary="Detects missing colons based on 150+ known K8s fields" /></ListItemButton>
-                            <Divider component="li" />
-                            <ListItemButton><ListItemText primary="✅ Fuzzy Field Name Matching" secondary="Auto-corrects 80+ common typos using Levenshtein distance" /></ListItemButton>
-                            <Divider component="li" />
-                            <ListItemButton><ListItemText primary="✅ Type Awareness & Coercion" secondary="Converts values to expected types with 100+ field definitions" /></ListItemButton>
+                            {['5-Pass Repair Pipeline', 'Context-Aware Key Detection', 'Fuzzy Field Name Matching', 'Type Awareness & Coercion'].map((text, i) => (
+                                <React.Fragment key={i}>
+                                    <ListItemButton>
+                                        <ListItemText
+                                            primary={`✅ ${text}`}
+                                            primaryTypographyProps={{ color: isDarkMode ? '#e0e0e0' : 'inherit' }}
+                                        />
+                                    </ListItemButton>
+                                    <Divider component="li" sx={{ opacity: 0.1 }} />
+                                </React.Fragment>
+                            ))}
                         </List>
                     </SectionWrapper>
 
@@ -369,10 +348,6 @@ export const Documentation: React.FC<DocumentationProps> = ({ onClose }) => {
                         <Typography variant="h4" sx={headingStyle}>
                             <FixerIcon sx={{ color: '#1A73E8' }} /> 5-Pass Fixer Architecture
                         </Typography>
-                        <Typography sx={paragraphStyle}>
-                            Core Logic: <code>intelligent-fixer.ts</code> (3,334 lines, 73 functions)
-                        </Typography>
-
                         <Grid container spacing={2} sx={{ mt: 2 }}>
                             {[
                                 { pass: 'Pass 1', name: 'Syntax Normalization', desc: 'Fix missing colons, add spaces, normalize quotes and indentation.' },
@@ -381,12 +356,12 @@ export const Documentation: React.FC<DocumentationProps> = ({ onClose }) => {
                                 { pass: 'Pass 4', name: 'Type Coercion', desc: 'Word-to-number conversion, boolean string normalization, type validation.' },
                                 { pass: 'Pass 5', name: 'Final Validation', desc: 'Parse check, calculate overall confidence, generate statistics.' },
                             ].map((pass) => (
-                                <Grid item xs={12} key={pass.pass}>
+                                <Grid size={12} key={pass.pass}>
                                     <Paper elevation={0} sx={{
                                         p: 2,
                                         borderRadius: '12px',
                                         bgcolor: isDarkMode ? 'rgba(255,255,255,0.03)' : '#f5f5f5',
-                                        borderLeft: `4px solid ${theme.palette.primary.main}`
+                                        borderLeft: '4px solid #1A73E8'
                                     }}>
                                         <Typography variant="subtitle2" fontWeight={700} color="primary">{pass.pass}: {pass.name}</Typography>
                                         <Typography variant="body2" color="text.secondary">{pass.desc}</Typography>
@@ -401,25 +376,17 @@ export const Documentation: React.FC<DocumentationProps> = ({ onClose }) => {
                         <Typography variant="h4" sx={headingStyle}>
                             <KnowledgeIcon sx={{ color: '#1A73E8' }} /> Comprehensive Type Registry
                         </Typography>
-                        <Typography sx={paragraphStyle}>
-                            Located in <code>type-registry.ts</code>. Defines 100+ K8s fields with strict type constraints.
-                        </Typography>
-
-                        <Typography variant="h6" sx={subHeadingStyle}>Examples</Typography>
                         <Box sx={codeBlockStyle}>
                             {`// Numeric Fields
 replicas: integer, min: 0, default: 1
 port: integer, min: 1, max: 65535
-initialDelaySeconds: integer, min: 0, default: 0
 
 // Boolean Fields
 privileged: default false
 hostNetwork: default false
-allowPrivilegeEscalation: default true
 
 // String Enums
-imagePullPolicy: ['Always', 'Never', 'IfNotPresent']
-restartPolicy: ['Always', 'OnFailure', 'Never']`}
+imagePullPolicy: ['Always', 'Never', 'IfNotPresent']`}
                         </Box>
                     </SectionWrapper>
 
@@ -428,29 +395,10 @@ restartPolicy: ['Always', 'OnFailure', 'Never']`}
                         <Typography variant="h4" sx={headingStyle}>
                             <CliIcon sx={{ color: '#1A73E8' }} /> CLI Tool
                         </Typography>
-                        <Typography sx={paragraphStyle}>
-                            Podscribe includes a robust CLI for CI/CD pipelines.
-                        </Typography>
-
-                        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Scan Command</Typography>
                         <Box sx={codeBlockStyle}>
                             {`k8s-lint scan <path> [options]
-
-Options:
-  --k8s-version <version>    Kubernetes version to validate against
-  --policy-dir <dir>         Directory containing policy files
-  --output <format>          Output format (text/json/sarif)
-  --severity-threshold       Minimum severity (warning/error)`}
-                        </Box>
-
-                        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Fix Command</Typography>
-                        <Box sx={codeBlockStyle}>
-                            {`k8s-lint yaml fix <path> [options]
-
-Options:
-  --aggressive               Apply aggressive structural fixes
-  --dry-run                  Preview changes without modifying
-  --diff                     Show detailed diff of changes`}
+--k8s-version <version>
+--output <format>`}
                         </Box>
                     </SectionWrapper>
 
@@ -459,27 +407,24 @@ Options:
                         <Typography variant="h4" sx={headingStyle}>
                             <ArchitectureIcon sx={{ color: '#1A73E8' }} /> Architecture
                         </Typography>
-                        <Typography sx={paragraphStyle}>A dual-engine architecture combining rule-based validation with semantic analysis.</Typography>
-
                         <Grid container spacing={2}>
-                            <Grid item xs={12} sm={6}>
+                            <Grid size={{ xs: 12, sm: 6 }}>
                                 <Paper elevation={0} sx={cardStyle}>
                                     <Typography variant="h6" gutterBottom>Frontend Stack</Typography>
                                     <List dense>
-                                        <ListItemText primary="React 18" secondary="UI framework with hooks" />
-                                        <ListItemText primary="Monaco Editor" secondary="VS Code engine" />
-                                        <ListItemText primary="TypeScript 5.6" secondary="Type safety" />
-                                        <ListItemText primary="Vite" secondary="Build tool" />
+                                        {['React 18', 'Monaco Editor', 'TypeScript 5.6', 'Vite'].map(i => (
+                                            <ListItemText key={i} primary={i} primaryTypographyProps={{ color: isDarkMode ? '#e0e0e0' : 'inherit' }} />
+                                        ))}
                                     </List>
                                 </Paper>
                             </Grid>
-                            <Grid item xs={12} sm={6}>
+                            <Grid size={{ xs: 12, sm: 6 }}>
                                 <Paper elevation={0} sx={cardStyle}>
                                     <Typography variant="h6" gutterBottom>Backend Stack</Typography>
                                     <List dense>
-                                        <ListItemText primary="Express ^5.1.0" secondary="Web server" />
-                                        <ListItemText primary="js-yaml ^4.1.1" secondary="YAML parsing" />
-                                        <ListItemText primary="Parser/Fixer logic" secondary="Custom TS engines" />
+                                        {['Express ^5.1.0', 'js-yaml ^4.1.1', 'Note: 818 Lines of Backend Code'].map(i => (
+                                            <ListItemText key={i} primary={i} primaryTypographyProps={{ color: isDarkMode ? '#e0e0e0' : 'inherit' }} />
+                                        ))}
                                     </List>
                                 </Paper>
                             </Grid>
@@ -491,124 +436,83 @@ Options:
                         <Typography variant="h4" sx={headingStyle}>
                             <ApiIcon sx={{ color: '#1A73E8' }} /> API Endpoints
                         </Typography>
-
-                        <Paper elevation={0} sx={{ ...cardStyle, mb: 3 }}>
+                        <Paper elevation={0} sx={cardStyle}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
                                 <Chip label="POST" color="primary" size="small" />
                                 <Typography fontWeight={700}>/api/validate</Typography>
                             </Box>
-                            <Typography variant="body2" sx={{ mb: 2 }}>Rule-Based Validator for security and best practices.</Typography>
-                            <Box sx={codeBlockStyle}>
-                                {`// Request
-{
-  "yaml": "apiVersion: v1..."
-}
-
-// Response
-{
-  "valid": false,
-  "errors": [{...}],
-  "warnings": [{...}]
-}`}
-                            </Box>
-                        </Paper>
-
-                        <Paper elevation={0} sx={cardStyle}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                                <Chip label="POST" color="secondary" size="small" />
-                                <Typography fontWeight={700}>/api/yaml/validate</Typography>
-                            </Box>
-                            <Typography variant="body2" sx={{ mb: 2 }}>Intelligent Auto-Fixer with semantic repair.</Typography>
-                            <Box sx={codeBlockStyle}>
-                                {`// Request
-{
-  "content": "apiVersion: v1...",
-  "options": { "autoFix": true }
-}
-
-// Response
-{
-  "success": true,
-  "fixed": "...",
-  "changes": [{ "type": "syntax", "message": "..." }],
-  "isValid": true
-}`}
-                            </Box>
+                            <Typography variant="body2" sx={{ mb: 2 }}>Rule-Based Validator.</Typography>
                         </Paper>
                     </SectionWrapper>
 
-                    {/* USAGE GUIDE */}
-                    <SectionWrapper id="usage">
+                    {/* PROJECT STRUCTURE */}
+                    <SectionWrapper id="project-structure">
                         <Typography variant="h4" sx={headingStyle}>
-                            <InterfaceIcon sx={{ color: '#1A73E8' }} /> Usage Guide
+                            <ProjectIcon sx={{ color: '#1A73E8' }} /> Project Structure
                         </Typography>
-                        <List>
-                            <ListItemButton><ListItemText primary="1. Enter YAML" secondary="Paste broken YAML in the left editor panel." /></ListItemButton>
-                            <ListItemButton><ListItemText primary="2. Enable Auto-Fix" secondary="Toggle the switch in the header (enabled by default)." /></ListItemButton>
-                            <ListItemButton><ListItemText primary="3. Validate" secondary="Click 'Validate' or wait for auto-debounce." /></ListItemButton>
-                            <ListItemButton><ListItemText primary="4. Console" secondary="Review fixes and errors in the side console." /></ListItemButton>
-                        </List>
-                    </SectionWrapper>
-
-                    {/* CONFIGURATION */}
-                    <SectionWrapper id="configuration">
-                        <Typography variant="h4" sx={headingStyle}>
-                            <ConfigIcon sx={{ color: '#1A73E8' }} /> Configuration
+                        <Typography sx={paragraphStyle}>
+                            Total: 78 files, 20,997 lines of code.
                         </Typography>
                         <Box sx={codeBlockStyle}>
-                            {`// intelligent-fixer.ts options
-{
-  confidenceThreshold: 0.7, // Default. Aggressive: 0.6
-  aggressive: false,        // True for more risky fixes
-  maxIterations: 3,         // Self-correction loops
-  indentSize: 2,            // 2 or 4 spaces
-  autoFix: true
-}`}
+                            {`k8s-yaml-lint/
+├── src/                     # 17,574 LOC (83.7%)
+│   ├── components/          # React components
+│   │   ├── UnifiedValidator.tsx
+│   │   ├── Documentation.tsx
+│   ├── semantic/            # Intelligent validator
+│   │   ├── intelligent-fixer.ts
+│   │   ├── semantic-parser.ts
+│   ├── fixers/              # Specialized fixers
+│   ├── knowledge/           # K8s knowledge base
+│   ├── stages/              # 10-stage pipeline
+│   ├── api/                 # API client
+│   └── main.tsx             # Entry point
+├── server/                  # 818 LOC (3.9%)
+│   ├── index.js             # Express server
+│   └── routes/
+└── tests/                   # Test files`}
                         </Box>
+                        <Paper elevation={0} sx={{ ...cardStyle, mt: 3, p: 2 }}>
+                            <Typography variant="subtitle2" sx={{ mb: 1 }}>Metrics</Typography>
+                            <Grid container spacing={2}>
+                                <Grid size={4}><Typography variant="body2">Frontend: 83.7%</Typography></Grid>
+                                <Grid size={4}><Typography variant="body2">Backend: 3.9%</Typography></Grid>
+                                <Grid size={4}><Typography variant="body2">Config: 12.4%</Typography></Grid>
+                            </Grid>
+                        </Paper>
                     </SectionWrapper>
 
-                    {/* EXAMPLES */}
-                    <SectionWrapper id="examples">
+                    {/* DESIGN SYSTEM */}
+                    <SectionWrapper id="design-system">
                         <Typography variant="h4" sx={headingStyle}>
-                            <ExamplesIcon sx={{ color: '#1A73E8' }} /> Real-World Examples
+                            <StyleIcon sx={{ color: '#1A73E8' }} /> Design System
                         </Typography>
-
-                        <Typography variant="h6" sx={subHeadingStyle}>1. Typo Correction</Typography>
                         <Grid container spacing={2}>
-                            <Grid item xs={6}>
-                                <Typography variant="caption" display="block" color="error">Input</Typography>
-                                <Box sx={codeBlockStyle}>
-                                    {`metdata:
-  name test
-sepc:
-  contaienrs:
-    - name nginx`}
-                                </Box>
+                            <Grid size={{ xs: 12, md: 4 }}>
+                                <Paper elevation={0} sx={cardStyle}>
+                                    <Typography variant="h6" gutterBottom>Colors</Typography>
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#007AFF' }} /> Primary Blue</Box>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#34C759' }} /> Success Green</Box>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#FF3B30' }} /> Error Red</Box>
+                                    </Box>
+                                </Paper>
                             </Grid>
-                            <Grid item xs={6}>
-                                <Typography variant="caption" display="block" color="success">Fixed Output</Typography>
-                                <Box sx={codeBlockStyle}>
-                                    {`metadata:
-  name: test
-spec:
-  containers:
-    - name: nginx`}
-                                </Box>
+                            <Grid size={{ xs: 12, md: 4 }}>
+                                <Paper elevation={0} sx={cardStyle}>
+                                    <Typography variant="h6" gutterBottom>Typography</Typography>
+                                    <Typography variant="body2">Font: SF Pro Display</Typography>
+                                    <Typography variant="body2">Mono: JetBrains Mono</Typography>
+                                </Paper>
+                            </Grid>
+                            <Grid size={{ xs: 12, md: 4 }}>
+                                <Paper elevation={0} sx={cardStyle}>
+                                    <Typography variant="h6" gutterBottom>Glassmorphism</Typography>
+                                    <Typography variant="body2">Blur: 40px (2xl)</Typography>
+                                    <Typography variant="body2">Opacity: 40-70%</Typography>
+                                </Paper>
                             </Grid>
                         </Grid>
-
-                        <Typography variant="h6" sx={subHeadingStyle}>2. Type Coercion</Typography>
-                        <Box sx={codeBlockStyle}>
-                            {`// Input
-replicas three
-port eighty
-hostNetwork yes
-
-// Fixed
-replicas: 3
-port: 80
-hostNetwork: true`}
-                        </Box>
                     </SectionWrapper>
 
                     {/* PERFORMANCE */}
@@ -623,7 +527,7 @@ hostNetwork: true`}
                                 { label: 'Bundle Size', val: '~500KB' },
                                 { label: 'First Load', val: '< 2s' },
                             ].map((stat, idx) => (
-                                <Grid item xs={3} key={idx}>
+                                <Grid size={3} key={idx}>
                                     <Paper sx={{ textAlign: 'center', p: 2, bgcolor: isDarkMode ? '#1E1E1E' : '#FFF' }}>
                                         <Typography variant="h5" color="primary" fontWeight={700}>{stat.val}</Typography>
                                         <Typography variant="caption" color="text.secondary">{stat.label}</Typography>
@@ -632,6 +536,7 @@ hostNetwork: true`}
                             ))}
                         </Grid>
                     </SectionWrapper>
+
 
                 </Box>
 

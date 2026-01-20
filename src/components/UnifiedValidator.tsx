@@ -144,7 +144,11 @@ export const UnifiedValidator: React.FC = () => {
         const startTime = performance.now();
 
         try {
-            const response = await fetch('http://localhost:3001/api/yaml/validate', {
+            const apiBase = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+                ? ''
+                : 'http://localhost:3001';
+
+            const response = await fetch(`${apiBase}/api/yaml/validate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1445,7 +1449,7 @@ export const UnifiedValidator: React.FC = () => {
 
             {/* Documentation Modal */}
             {showDocumentation && (
-                <Documentation onClose={() => setShowDocumentation(false)} />
+                <Documentation onClose={() => setShowDocumentation(false)} darkMode={darkMode} />
             )}
 
             {/* Snackbar Toasts */}

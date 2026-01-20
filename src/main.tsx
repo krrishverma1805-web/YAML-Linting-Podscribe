@@ -10,7 +10,7 @@ import App from './App.tsx'
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 import yamlWorker from 'monaco-yaml/yaml.worker?worker';
 
-// @ts-expect-error - Monaco global
+// @ts-ignore - Monaco global
 self.MonacoEnvironment = {
   getWorker(_: unknown, label: string) {
     if (label === 'yaml') {

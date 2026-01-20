@@ -257,22 +257,22 @@ const NUMERIC_PATTERNS = [
 ];
 
 // Valid Kubernetes top-level fields
-const VALID_TOP_LEVEL_FIELDS = new Set([
-    'apiVersion', 'kind', 'metadata', 'spec', 'data', 'stringData', 'type',
-    'rules', 'subjects', 'roleRef', 'webhooks', 'caBundle', 'status',
-    'items', 'secrets', 'imagePullSecrets', 'parameters', 'provisioner',
-    'immutable', 'binaryData', 'automountServiceAccountToken'
-]);
+// const VALID_TOP_LEVEL_FIELDS = new Set([
+//     'apiVersion', 'kind', 'metadata', 'spec', 'data', 'stringData', 'type',
+//     'rules', 'subjects', 'roleRef', 'webhooks', 'caBundle', 'status',
+//     'items', 'secrets', 'imagePullSecrets', 'parameters', 'provisioner',
+//     'immutable', 'binaryData', 'automountServiceAccountToken'
+// ]);
 
 // Common field name typos and their corrections
-const FIELD_TYPO_MAP: Record<string, string> = {
-    'meta': 'metadata',
-    'metdata': 'metadata',
-    'metaData': 'metadata',
-    'Meta': 'metadata',
-    'speC': 'spec',
-    'specS': 'spec'
-};
+// const FIELD_TYPO_MAP: Record<string, string> = {
+//     'meta': 'metadata',
+//     'metdata': 'metadata',
+//     'metaData': 'metadata',
+//     'Meta': 'metadata',
+//     'speC': 'spec',
+//     'specS': 'spec'
+// };
 
 // Comprehensive list of known parent keywords that need colons
 // Comprehensive list of known parent keywords that need colons
@@ -1320,7 +1320,7 @@ export class MultiPassFixer {
         const match = line.match(/^(\s*)(kind)(:?)\s+(.*)$/i);
         if (!match) return null;
 
-        const [, indent, key, colon, value] = match;
+        const [, indent, _key, _colon, value] = match;
         // ignore comments
         if (value.trim().startsWith('#')) return null;
 

@@ -6,10 +6,11 @@
   "scripts": {
     "dev": "concurrently \"vite\" \"nodemon server/index.js\"",
     "build": "tsc -b && vite build",
+    "start": "node server/index.js",
     "lint": "eslint .",
     "preview": "vite preview",
     "build:cli": "tsc -p tsconfig.cli.json",
-    "server": "nodemon server/index.js",
+    "server": "node server/index.js",
     "test": "vitest run",
     "test:watch": "vitest"
   },
